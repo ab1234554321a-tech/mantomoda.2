@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "manto-tools": {
+    "manto-moda-core": {
       "command": "node",
-      "args": ["skills/orchestrator.js"],
-      "description": "Manto Moda Multi-Agent Skills Orchestrator"
+      "args": ["src/mcp/server.js"],
+      "description": "Official Manto Moda Model Context Protocol Server (Stdio JSON-RPC 2.0)"
     }
   }
 }

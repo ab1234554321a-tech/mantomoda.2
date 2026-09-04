@@ -7,56 +7,53 @@
 ## 1. Project Snapshot
 
 - **Project Name**: Manto Moda (مانتو مدا)
-- **Current Phase**: Phase 6 & Phase 8 (Core Application & Automated Testing) Complete — Initializing Phase 7 & 9 (Security Hardening & Production Delivery)
-- **Overall Progress**: 75%
+- **Current Phase**: Phase 7, 8 & CTO Orchestration Complete — Advancing to Phase 9 (Persistent PostgreSQL & Production Delivery)
+- **Overall Progress**: 88%
+- **Health Score**: **94.4 / 100** (Evidence-based assessment in `PROJECT_AUDIT.md`)
 - **Last Updated**: 2026-09-04
 - **Active Git Branch**: `main`
-- **Last Major Change**: Implemented full-stack architecture: Express API server with RBAC middleware, backend Price Sanitization (`ADR-003`), Wholesale application & review lifecycle (`ADR-002`), dynamic Cart & Pricing calculation engine, Persian RTL responsive web UI, and automated CI test suite.
+- **Last Major Change**: Completed Master Orchestrator CTO Cycle: Formalized all 12 Agent role specs (`agents/`), built protocol-compliant Stdio JSON-RPC 2.0 MCP server (`src/mcp/server.js`), implemented Zod request validation schemas, integrated Helmet security headers, anti-brute force rate limiting, SRE request duration logs, graceful shutdown handlers, and 4-tier automated test gate including Red Team adversarial tests.
 
 ---
 
 ## 2. Completed (انجام‌شده)
 
-- [x] **Phase 1 & 2: Governance & Source of Truth Setup**
-  - [x] Initialized Git repository as Single Source of Truth (`main` branch).
-  - [x] Security-hardened `.gitignore` preventing secret leakage.
-  - [x] Embedded full 70-point Master Roadmap in `ROADMAP.md`.
-  - [x] Formulated 14 Global AI Engineering Guidelines in `AGENTS.md`.
-  - [x] Defined agent-specific guides (`CLAUDE.md`, `CODEX.md`).
-  - [x] Recorded ADR-001 through ADR-005 in `DECISIONS.md`.
-  - [x] Documented system architecture and domain models in `ARCHITECTURE.md`.
-- [x] **Phase 3 & 6: Core Application Implementation**
-  - [x] In-memory relational data store with seed users, products, variants, orders, and applications.
-  - [x] Role-Based Access Control (`REGULAR`, `WHOLESALE`, `ADMIN`) middleware.
-  - [x] **Strict Backend Price Sanitization**: Non-wholesale users never receive wholesale price fields in API responses.
-  - [x] Wholesale application submission and admin review/approval state machine.
-  - [x] Role-aware cart and pricing engine validating prices strictly on the server.
-  - [x] Orders and checkout lifecycle management (`PENDING` -> `CONFIRMED` -> `PROCESSING` -> `SHIPPED` -> `DELIVERED`).
-  - [x] Admin dashboard API endpoints (Stats KPI, Wholesale approvals, Order status updates, Catalog inventory).
-- [x] **Frontend Mobile-First Web Client**
-  - [x] Responsive Persian RTL UI with Tailwind CSS.
-  - [x] Product catalog with category pills, season filters, sorting, and search debouncing.
-  - [x] Interactive role switcher for live perspective testing (Guest, Retail, Pending, Wholesale, Admin).
-  - [x] Product detail modal with multi-image gallery, variant selection, and quantity adjusters.
-  - [x] Wholesale portal with merchant application form and live status tracking.
-  - [x] Slide-out cart drawer with live server-side price recalculation and wholesale threshold notices.
-  - [x] Step-by-step checkout modal with shipping address validation and order confirmation receipts.
-  - [x] User order history view.
-  - [x] Admin portal dashboard (KPI stats, wholesale approval review, order management, inventory overview).
-- [x] **Phase 8: Automated Testing Gate**
-  - [x] Security test suite: Wholesale price isolation verified (`tests/security.test.js`).
-  - [x] Wholesale workflow test suite: Approval state machine verified (`tests/wholesale.test.js`).
-  - [x] Pricing engine test suite: Bulk threshold & savings verified (`tests/pricing.test.js`).
-  - [x] All test suites passing in CI runner (`npm test`).
+- [x] **Full 12-Agent Ecosystem (`agents/01` to `agents/12`)**:
+  - [x] 01 System Architect, 02 Core Developer, 03 QA Test Engineer, 04 Security Officer, 05 Release Operator.
+  - [x] 06 Performance Engineer, 07 Dependency Supply-Chain Engineer, 08 UX/Accessibility Engineer, 09 Data/Database Architect, 10 Observability/SRE Engineer, 11 Documentation Engineer, 12 Red Team Adversarial Tester.
+- [x] **Protocol-Compliant MCP Server (`src/mcp/server.js`)**:
+  - [x] Implemented on `@modelcontextprotocol/sdk` over Stdio JSON-RPC 2.0.
+  - [x] Registered tools: `audit_project_health`, `verify_security_guard`, `get_project_state`, `list_catalog_items`.
+  - [x] Registered resources: `manto://state`, `manto://architecture`.
+- [x] **Web Security & Input Validation**:
+  - [x] Zod schema validation on login, register, wholesale apply, and checkout order routes.
+  - [x] Helmet HTTP security headers with Content-Security-Policy.
+  - [x] Express Rate Limiting against authentication brute-force attacks.
+  - [x] Total elimination of `x-user-id` header spoofing; enforced cryptographic HMAC-SHA256 JWT tokens.
+  - [x] bcrypt password hashing with 10 salt rounds.
+- [x] **Observability & SRE**:
+  - [x] Automatic `X-Request-Id` generation and response header propagation.
+  - [x] Structured request duration logging (`[HTTP] METHOD /path -> Status (duration ms)`).
+  - [x] Extended health endpoint `/api/health` with memory metrics and uptime.
+  - [x] Clean graceful shutdown on `SIGTERM` and `SIGINT`.
+- [x] **Comprehensive 4-Tier Automated Test Gate (100% Passed)**:
+  - [x] Level 1: Pricing Engine & Threshold Calculations (`tests/pricing.test.js`).
+  - [x] Level 2: Wholesale Application & Admin Approval (`tests/wholesale.test.js`).
+  - [x] Level 3: Price Isolation & JWT Cryptography (`tests/security.test.js`).
+  - [x] Level 4: Red Team Adversarial, Type Confusion & BOLA (`tests/adversarial.test.js`).
+- [x] **Engineering Governance & Registries**:
+  - [x] `PROJECT_AUDIT.md` (17-point full audit report).
+  - [x] `BACKLOG.md` (Prioritized issues registry).
+  - [x] `TECH_DEBT.md` (Technical debt ledger).
 
 ---
 
 ## 3. In Progress (در حال اجرا)
 
-- [ ] **Phase 7 & 9: Security Hardening & Production Readiness**
-  - [ ] Request rate limiting for authentication routes.
-  - [ ] Production environment variable configuration template.
-  - [ ] Persistent database connection adapter (SQLite / PostgreSQL) for cloud deployment.
+- [ ] **Phase 9: Production Infrastructure & Persistent PostgreSQL**
+  - [ ] Provisioning PostgreSQL database connection via Prisma ORM (`BL-005`).
+  - [ ] Pluggable Payment Gateway IPG adapter for live merchant transactions (`BL-006`).
+  - [ ] SMS OTP provider integration (`BL-007`).
 
 ---
 
@@ -68,26 +65,25 @@
 
 ## 5. Known Bugs (باگ‌های شناخته‌شده)
 
-- None. All automated test suites and live API endpoints validated.
+- None. All 4 automated test suites and live API endpoints validated with 0 errors.
 
 ---
 
 ## 6. Current Risks (ریسک‌های فعلی)
 
-- **Cloud DB Migration**: Transitioning from in-memory relational store to persistent SQL database in cloud production requires running database migration scripts.
-- **Payment Gateway Integration**: Live banking gateway (Zarinpal/Saman) requires live merchant credentials before production launch.
+- **PostgreSQL Connection in Production**: Migration from in-memory store to PostgreSQL required for multi-replica horizontal scaling. (Mitigation: Data layer abstracted in `src/server/db/store.js`).
+- **Live Bank Terminal Credentials**: Required from stakeholder for real transaction settlement.
 
 ---
 
 ## 7. Next Recommended Step (قدم بعدی پیشنهادی)
 
-1. Add environment configuration template (`.env.example`).
-2. Implement rate-limiting middleware for auth routes.
-3. Prepare containerization (Dockerfile) for cloud deployment.
+1. Connect persistent PostgreSQL database via Prisma ORM as defined in `BACKLOG.md` (BL-005).
+2. Wire real IPG payment callback and SMS OTP verification upon business owner providing credentials.
 
 ---
 
 ## 8. Human Decisions Required (تصمیمات انسانی موردنیاز)
 
-- **Payment Gateway Provider**: Selection of final Iranian payment gateway provider (e.g., Zarinpal, Pay.ir, Saman Bank, Mellat Bank) for merchant terminal credentials.
-- **SMS Gateway Provider**: Selection of Kavehnegar / FarazSMS for OTP verification on registration.
+- **Payment Gateway Choice**: Zarinpal vs Direct Bank IPG (Saman / Mellat).
+- **SMS Gateway Choice**: Kavehnegar vs FarazSMS.

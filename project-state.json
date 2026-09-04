@@ -1,13 +1,14 @@
 {
   "projectName": "Manto Moda",
-  "version": "0.2.0-beta",
-  "lastUpdated": "2026-09-04T15:25:00Z",
+  "version": "0.3.0-rc1",
+  "lastUpdated": "2026-09-04T15:45:00Z",
   "activeBranch": "main",
-  "currentPhase": "Phase 6 & 8 Complete — Advancing to Phase 7 & 9 (Security Hardening & Production Delivery)",
-  "overallProgressPercent": 75,
+  "currentPhase": "Phase 7 & 8 Completed — Advancing to Phase 9 (Production DB & Deployment Delivery)",
+  "overallProgressPercent": 88,
+  "healthScore": 94.4,
   "completed": [
     "Git repository initialization & Source of Truth governance",
-    "Master Roadmap (ROADMAP.md) and Agent Guidelines (AGENTS.md, CLAUDE.md, CODEX.md)",
+    "Master Roadmap (ROADMAP.md) and 12-Agent Ecosystem (agents/01 to agents/12)",
     "Architectural Decision Records (DECISIONS.md: ADR-001 to ADR-005)",
     "System Architecture & Domain Models (ARCHITECTURE.md)",
     "Relational data store with seed catalog, users, variants, and orders",
@@ -15,31 +16,37 @@
     "Strict backend price sanitizer preventing wholesale price leaks (ADR-003)",
     "Wholesale merchant application & admin approval workflow (ADR-002)",
     "Server-verified cart & bulk pricing engine",
-    "Order creation & state machine lifecycle",
+    "Order creation & state machine lifecycle with BOLA protection",
     "Admin dashboard APIs for KPI stats, wholesale approvals, and orders",
     "Responsive Persian RTL Frontend (Catalog, Wholesale Portal, Cart Drawer, Checkout, Orders, Admin Panel)",
-    "Automated CI testing suite with security price isolation, approval logic, and pricing calculations"
+    "Eliminated x-user-id header spoofing vulnerability; enforced HMAC-SHA256 JWT & bcrypt",
+    "Input validation schemas via Zod across all endpoints",
+    "Helmet security headers with custom CSP and Express Rate Limiting",
+    "SRE Request-ID tracing, duration logging, memory metrics, and graceful shutdown",
+    "Official Stdio JSON-RPC 2.0 MCP Server via @modelcontextprotocol/sdk (src/mcp/server.js)",
+    "4-Tier Automated CI Testing Gate: Unit, Integration, Security, and Red Team Adversarial tests",
+    "PROJECT_AUDIT.md, BACKLOG.md, and TECH_DEBT.md engineering registries"
   ],
   "inProgress": [
-    "Environment variable configuration template (.env.example)",
-    "Rate limiting middleware on auth endpoints",
-    "Production containerization setup"
+    "Persistent PostgreSQL database migration (BL-005)",
+    "Iranian IPG Payment Gateway adapter (BL-006)",
+    "SMS OTP mobile verification (BL-007)"
   ],
   "blocked": [],
   "knownBugs": [],
   "risks": [
     {
-      "risk": "Payment Gateway credentials required for real transactions",
+      "risk": "Persistent SQL DB connection for multi-replica horizontal scaling",
       "severity": "MEDIUM",
-      "mitigation": "Simulated instant payment gateway in place; pluggable provider adapter ready"
+      "mitigation": "Store pattern abstracts data layer for straightforward Prisma / PostgreSQL drop-in"
     },
     {
-      "risk": "Persistent SQL DB connection for multi-instance horizontal scaling",
+      "risk": "Payment Gateway credentials required for real transactions",
       "severity": "LOW",
-      "mitigation": "Store pattern abstracts data layer for straightforward Prisma / PostgreSQL drop-in"
+      "mitigation": "Simulated instant payment gateway in place; pluggable provider adapter ready"
     }
   ],
-  "nextRecommendedStep": "Add production environment templates (.env.example, Dockerfile), review security headers, and finalize production deployment checklist.",
+  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM and prepare live production staging.",
   "humanDecisionsRequired": [
     "Select Iranian Payment Gateway provider (Zarinpal / Pay.ir / Bank IPG)",
     "Select Iranian SMS OTP Gateway provider (Kavehnegar / FarazSMS)"

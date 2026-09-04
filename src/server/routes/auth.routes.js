@@ -2,20 +2,13 @@ import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { hashPassword, comparePassword, signToken } from '../utils/auth-crypto.js';
+import { validate, loginSchema, registerSchema } from '../middlewares/validate.js';
 
 const router = Router();
 
-// Login with Email/Phone & Password verification
-router.post('/login', async (req, res) => {
+// Login with Schema Validation & Secure Password Verification
+router.post('/login', validate(loginSchema), async (req, res) => {
   const { identifier, password } = req.body;
-
-  if (!identifier || !password) {
-    return res.status(400).json({
-      success: false,
-      error: 'MISSING_FIELDS',
-      message: 'لطفاً ایمیل یا شماره موبایل و رمز عبور خود را وارد کنید.'
-    });
-  }
 
   // Find user by email or phone
   const user = db.findUserByEmail(identifier) || db.findUserByPhone(identifier);
@@ -59,25 +52,9 @@ router.post('/login', async (req, res) => {
   });
 });
 
-// Register with Password Hashing
-router.post('/register', async (req, res) => {
+// Register with Schema Validation & Password Hashing
+router.post('/register', validate(registerSchema), async (req, res) => {
   const { fullName, email, phone, password } = req.body;
-
-  if (!fullName || !phone || !password) {
-    return res.status(400).json({
-      success: false,
-      error: 'MISSING_FIELDS',
-      message: 'نام و نام خانوادگی، شماره موبایل و رمز عبور الزامی است.'
-    });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      error: 'WEAK_PASSWORD',
-      message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.'
-    });
-  }
 
   if (phone && db.findUserByPhone(phone)) {
     return res.status(409).json({
@@ -168,7 +145,6 @@ router.post('/switch-role', (req, res) => {
     });
   }
 
-  // Issue real cryptographically signed JWT for the switched role
   const token = signToken(targetUser);
 
   res.json({

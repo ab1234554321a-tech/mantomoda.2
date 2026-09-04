@@ -1,28 +1,13 @@
 import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
+import { validate, orderCheckoutSchema } from '../middlewares/validate.js';
 
 const router = Router();
 
-// Create Order (Checkout)
-router.post('/', requireAuth, (req, res) => {
+// Create Order (Checkout) with Server-Side Recalculation & Schema Validation
+router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
   const { items, shippingAddress, paymentMethod } = req.body;
-
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'EMPTY_CART',
-      message: 'سبد خرید شما خالی است.'
-    });
-  }
-
-  if (!shippingAddress || !shippingAddress.recipientName || !shippingAddress.phone || !shippingAddress.fullAddress) {
-    return res.status(400).json({
-      success: false,
-      error: 'INVALID_SHIPPING',
-      message: 'اطلاعات کامل آدرس و گیرنده الزامی است.'
-    });
-  }
 
   const isWholesaleUser = req.user.role === 'ADMIN' || (req.user.role === 'WHOLESALE' && req.user.isWholesaleVerified === true);
 
@@ -37,7 +22,7 @@ router.post('/', requireAuth, (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'PRODUCT_UNAVAILABLE',
-        message: `محصول «${item.productTitle || item.productId}» در حال حاضر در دسترس نیست.`
+        message: `محصول «${item.productId}» در حال حاضر در دسترس نیست یا غیرفعال است.`
       });
     }
 
@@ -97,7 +82,7 @@ router.get('/my-orders', requireAuth, (req, res) => {
   });
 });
 
-// Get Order Details
+// Get Order Details with Strict Ownership Access Control (IDOR / BOLA Prevention)
 router.get('/:id', requireAuth, (req, res) => {
   const order = db.findOrderById(req.params.id);
 
@@ -109,12 +94,12 @@ router.get('/:id', requireAuth, (req, res) => {
     });
   }
 
-  // Security: Check ownership or admin
+  // Security: Check resource ownership (BOLA / IDOR protection)
   if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
     return res.status(403).json({
       success: false,
       error: 'FORBIDDEN',
-      message: 'شما دسترسی به این سفارش را ندارید.'
+      message: 'شما دسترسی مجاز برای مشاهده این سفارش را ندارید.'
     });
   }
 

@@ -1,20 +1,13 @@
 import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
+import { validate, wholesaleApplySchema } from '../middlewares/validate.js';
 
 const router = Router();
 
-// Submit a Wholesale Application
-router.post('/apply', requireAuth, (req, res) => {
+// Submit a Wholesale Application with Schema Validation
+router.post('/apply', requireAuth, validate(wholesaleApplySchema), (req, res) => {
   const { companyName, economicCode, businessAddress, city, province, businessPhone, storeType } = req.body;
-
-  if (!companyName || !businessAddress || !city || !businessPhone) {
-    return res.status(400).json({
-      success: false,
-      error: 'MISSING_FIELDS',
-      message: 'نام فروشگاه/مزون، استان، شهر، آدرس و شماره تلفن کسب‌وکار الزامی است.'
-    });
-  }
 
   // Check if user already has an active application
   const existing = db.findApplicationByUserId(req.user.id);
