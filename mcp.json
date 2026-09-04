@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "manto-git-mcp": {
+      "command": "git",
+      "args": ["status"],
+      "description": "Git repository Source of Truth access for version control and commit history",
+      "env": {
+        "GIT_PAGER": "cat"
+      },
+      "permissions": {
+        "read": true,
+        "write": true,
+        "policy": "LeastPrivilege"
+      }
+    },
+    "manto-security-guard": {
+      "command": "node",
+      "args": ["skills/security-guard.js"],
+      "description": "Autonomous security auditor verifying price protection (ADR-003) and RBAC permissions",
+      "permissions": {
+        "execute": true
+      }
+    },
+    "manto-project-auditor": {
+      "command": "node",
+      "args": ["skills/project-auditor.js"],
+      "description": "Autonomous project health, test status, and architectural integrity audit tool",
+      "permissions": {
+        "execute": true
+      }
+    },
+    "manto-state-sync": {
+      "command": "node",
+      "args": ["skills/state-sync.js"],
+      "description": "Project State and project-state.json automated synchronization tool",
+      "permissions": {
+        "execute": true
+      }
+    }
+  }
+}

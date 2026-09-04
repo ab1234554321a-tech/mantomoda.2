@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "manto-tools": {
+      "command": "node",
+      "args": ["skills/orchestrator.js"],
+      "description": "Manto Moda Multi-Agent Skills Orchestrator"
+    }
+  }
+}

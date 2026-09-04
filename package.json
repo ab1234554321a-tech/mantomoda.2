@@ -1,16 +1,20 @@
 {
   "name": "manto-moda",
-  "version": "0.1.0",
+  "version": "0.2.0-beta",
   "private": true,
   "description": "Production-Ready Iranian Fashion & Wholesale E-Commerce Platform",
   "type": "module",
   "scripts": {
     "dev": "node src/server/index.js",
     "start": "node src/server/index.js",
-    "test": "node tests/run-tests.js"
+    "test": "node tests/run-tests.js",
+    "agent:audit": "node skills/project-auditor.js",
+    "agent:security": "node skills/security-guard.js",
+    "agent:sync": "node skills/state-sync.js",
+    "agent:all": "node skills/orchestrator.js"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^4.22.2"
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
   }
 }
