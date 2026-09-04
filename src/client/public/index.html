@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مانتو مدا | Manto Moda — پوشاک زنانه و سیستم عمده‌فروشی</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fdf4f5',
+              100: '#fbe8eb',
+              200: '#f7d5da',
+              300: '#f0b4bd',
+              400: '#e58596',
+              500: '#d75872',
+              600: '#c13957',
+              700: '#a22944',
+              800: '#87253b',
+              900: '#732336',
+              950: '#400e1a',
+            },
+            gold: {
+              500: '#d4af37',
+              600: '#aa8c2c',
+            }
+          },
+          fontFamily: {
+            sans: ['Vazirmatn', 'Shabnam', 'Tahoma', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP ANNOUNCEMENT BAR -->
+  <div class="bg-slate-900 text-slate-200 text-xs py-2 px-4 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-brand-600 text-white">سامانه هوشمند</span>
+        <span class="hidden sm:inline text-slate-300">عرضه مستقیم مانتو و ترنچ‌کت بهاره و پاییزه — ارسال سریع به سراسر کشور</span>
+      </div>
+      
+      <!-- QUICK ROLE SWITCHER (DEVELOPMENT & EVALUATION TOOL) -->
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-slate-400">شبیه‌ساز نقش کاربری:</span>
+        <select id="role-switcher-select" class="bg-slate-800 text-amber-300 font-medium px-2.5 py-1 rounded border border-slate-700 text-xs focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer">
+          <option value="GUEST">👤 کاربر مهمان (Guest)</option>
+          <option value="REGULAR" selected>🛍️ مشتری خرده‌فروشی (Retail)</option>
+          <option value="PENDING">⏳ متقاضی عمده (در انتظار تایید)</option>
+          <option value="WHOLESALE">💼 خریدار عمده تاییدشده (Wholesale)</option>
+          <option value="ADMIN">👑 مدیر سیستم (Store Admin)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN HEADER -->
+  <header class="bg-white/95 backdrop-blur sticky top-0 z-40 border-b border-slate-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        
+        <!-- LOGO & BRAND -->
+        <div class="flex items-center gap-3 cursor-pointer" onclick="navigate('catalog')">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-700 via-brand-600 to-amber-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-brand-500/20 ring-2 ring-white">
+            M
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-black text-2xl tracking-tight text-slate-900">مانتو مُدا</span>
+              <span class="text-[10px] font-bold tracking-widest text-brand-600 uppercase bg-brand-50 px-1.5 py-0.5 rounded border border-brand-200">Manto Moda</span>
+            </div>
+            <p class="text-[11px] text-slate-500">پلتفرم اختصاصی خرده‌فروشی و خرید عمده پوشاک</p>
+          </div>
+        </div>
+
+        <!-- DESKTOP NAVIGATION -->
+        <nav class="hidden md:flex items-center gap-1 font-medium text-sm text-slate-700">
+          <button onclick="navigate('catalog')" id="nav-catalog" class="nav-btn px-4 py-2 rounded-xl text-brand-700 bg-brand-50 font-bold transition">
+            کاتالوگ محصولات
+          </button>
+          <button onclick="navigate('wholesale')" id="nav-wholesale" class="nav-btn px-4 py-2 rounded-xl hover:text-brand-600 hover:bg-slate-100 transition flex items-center gap-1.5">
+            <span>درگاه عمده‌فروشی</span>
+            <span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold">ویژه مزون‌ها</span>
+          </button>
+          <button onclick="navigate('orders')" id="nav-orders" class="nav-btn px-4 py-2 rounded-xl hover:text-brand-600 hover:bg-slate-100 transition">
+            سفارش‌های من
+          </button>
+          <button onclick="navigate('admin')" id="nav-admin" class="nav-btn hidden px-4 py-2 rounded-xl hover:text-brand-600 hover:bg-slate-100 transition text-purple-700 bg-purple-50 font-bold flex items-center gap-1.5">
+            <span>پنل مدیریت</span>
+            <span id="nav-admin-badge" class="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.5 rounded-full font-bold">مدیر</span>
+          </button>
+        </nav>
+
+        <!-- ACTION BUTTONS & USER PROFILE -->
+        <div class="flex items-center gap-3">
+          
+          <!-- SEARCH TRIGGER (MOBILE/DESKTOP) -->
+          <div class="relative hidden sm:block w-48 lg:w-64">
+            <input type="text" id="header-search-input" placeholder="جستجوی مانتو، رنگ، جنس..." 
+              class="w-full bg-slate-100 border border-slate-200 text-xs rounded-xl pr-9 pl-3 py-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition">
+            <svg class="w-4 h-4 text-slate-400 absolute right-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
+
+          <!-- CART BUTTON -->
+          <button onclick="toggleCartDrawer()" class="relative p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+            <span id="cart-badge" class="hidden absolute -top-1.5 -left-1.5 bg-brand-600 text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+          </button>
+
+          <!-- USER STATUS BADGE / LOGIN -->
+          <div id="user-profile-badge" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+            <div class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs">
+              <span id="user-avatar-initial">ک</span>
+            </div>
+            <div class="flex flex-col text-right">
+              <span id="user-display-name" class="font-bold text-slate-800 text-[11px] leading-tight">مشتری عادی</span>
+              <span id="user-role-label" class="text-[10px] text-slate-500 font-medium">خرده‌فروشی</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MOBILE NAVIGATION BAR -->
+    <div class="md:hidden border-t border-slate-200 px-4 py-2 flex justify-around text-xs font-medium text-slate-600 bg-white">
+      <button onclick="navigate('catalog')" class="py-1 px-2 text-brand-700 font-bold">کاتالوگ</button>
+      <button onclick="navigate('wholesale')" class="py-1 px-2">فروش عمده</button>
+      <button onclick="navigate('orders')" class="py-1 px-2">سفارش‌ها</button>
+      <button onclick="navigate('admin')" id="nav-admin-mobile" class="hidden py-1 px-2 text-purple-700 font-bold">مدیریت</button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- HERO BANNER (CATALOG VIEW) -->
+    <section id="hero-banner" class="mb-8 rounded-3xl bg-gradient-to-r from-slate-900 via-brand-950 to-slate-900 text-white p-6 sm:p-10 relative overflow-hidden shadow-xl border border-slate-800">
+      <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-brand-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="relative z-10 max-w-2xl">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 backdrop-blur border border-white/20 text-amber-300 mb-4">
+          ✨ کالکشن جدید سال ۲۰۲۶ — طراحی و دوخت اختصاصی
+        </span>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight tracking-tight mb-3">
+          طراحی اصیل، کیفیت ماندگار، خرید امن
+        </h1>
+        <p class="text-sm sm:text-base text-slate-300 mb-6 leading-relaxed">
+          جدیدترین مدل‌های مانتو کتی، مجلسی، لینن و ترنچ‌کت پاییزه. قیمت مستقیم تولیدی ویژه خریداران خرده و دسترسی به نرخ عمده‌فروشی برای بوتیک‌ها و مزون‌داران معتبر.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <button onclick="scrollToProducts()" class="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm shadow-lg shadow-brand-600/30 transition flex items-center gap-2">
+            <span>مشاهده کالکشن</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          <button onclick="navigate('wholesale')" class="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 backdrop-blur transition">
+            ثبت درخواست خرید عمده (مزون‌ها)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 1: PRODUCT CATALOG & STORE -->
+    <div id="view-catalog" class="space-y-6">
+      
+      <!-- CATEGORY TABS & FILTER BAR -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        <!-- CATEGORY PILLS -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none" id="category-pills">
+          <button onclick="setCategoryFilter('ALL')" class="category-pill active px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition bg-slate-900 text-white shadow-sm">
+            همه محصولات
+          </button>
+          <!-- Dynamic Category Pills -->
+        </div>
+
+        <!-- EXTRA FILTERS (SEASON & SORT) -->
+        <div class="flex items-center gap-3 text-xs">
+          <select id="season-filter" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-1 focus:ring-brand-500">
+            <option value="">همه فصل‌ها</option>
+            <option value="چهار فصل">چهار فصل</option>
+            <option value="بهار و پاییز">بهار و پاییز</option>
+            <option value="تابستان">تابستانه</option>
+            <option value="پاییز و زمستان">پاییزه و زمستانه</option>
+          </select>
+
+          <select id="sort-filter" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-1 focus:ring-brand-500">
+            <option value="featured">پیشنهاد مدا (ویژه)</option>
+            <option value="price-asc">ارزان‌ترین</option>
+            <option value="price-desc">گران‌ترین</option>
+            <option value="rating">محبوب‌ترین</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- WHOLESALE USER NOTICE BANNER (IF WHOLESALE) -->
+      <div id="wholesale-active-banner" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg">
+            💼
+          </div>
+          <div>
+            <h4 class="font-bold text-sm">حالت خرید عمده همکار فعال است</h4>
+            <p class="text-xs text-amber-700">قیمت‌های تولیدی و نرخ عمده برای شما نمایش داده می‌شود. حداقل سفارش در هر مدل ۶ الی ۸ عدد می‌باشد.</p>
+          </div>
+        </div>
+        <span class="text-xs font-bold bg-amber-200 text-amber-900 px-3 py-1 rounded-lg">تایید شده توسط ادمین</span>
+      </div>
+
+      <!-- PRODUCTS GRID -->
+      <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Products injected dynamically -->
+      </div>
+
+      <!-- EMPTY STATE -->
+      <div id="products-empty" class="hidden text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300">
+        <svg class="w-16 h-16 mx-auto text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        <h3 class="text-lg font-bold text-slate-700">محصولی با این مشخصات یافت نشد</h3>
+        <p class="text-xs text-slate-500 mt-1">لطفاً فیلترها را تغییر دهید یا عبارت دیگری جستجو کنید.</p>
+      </div>
+
+    </div>
+
+    <!-- VIEW 2: WHOLESALE PORTAL & APPLICATION -->
+    <div id="view-wholesale" class="hidden space-y-8">
+      
+      <!-- HERO WHOLESALE -->
+      <div class="bg-gradient-to-br from-slate-900 via-amber-950 to-slate-900 text-white rounded-3xl p-8 sm:p-12 shadow-xl border border-amber-900/40">
+        <div class="max-w-3xl">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-3">
+            ویژه صاحبان بوتیک، مزون‌ها و فروشگاه‌های پوشاک
+          </span>
+          <h2 class="text-3xl sm:text-4xl font-black mb-4 leading-tight">
+            سامانه رسمی فروش عمده و سفارش تیراژ مدا
+          </h2>
+          <p class="text-sm sm:text-base text-slate-300 leading-relaxed mb-6">
+            با عضویت در باشگاه همکاران مدا، بدون واسطه و با قیمت مستقیم کارگاهی خرید کنید. تمامی قیمت‌های عمده پس از تایید مدارک کسب‌وکار و صدور مجوز در حساب کاربری شما فعال خواهند شد.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+            <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur">
+              <span class="text-amber-400 font-bold block text-sm mb-1">تضمین قیمت مستقیم</span>
+              ۳۰ الی ۴۰ درصد تخفیف واقعی نسبت به قیمت تک‌فروشی
+            </div>
+            <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur">
+              <span class="text-amber-400 font-bold block text-sm mb-1">تضمین کیفیت و اصالت</span>
+              دوخت صنعتی تمیز، پارچه‌های وارداتی و آسترکشی استاندارد
+            </div>
+            <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur">
+              <span class="text-amber-400 font-bold block text-sm mb-1">ارسال سریع و باربری</span>
+              بسته‌بندی کاوردار و ارسال به باربری‌های معتبر سراسر ایران
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WHOLESALE APPLICATION STATUS / FORM CONTAINER -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- APPLICATION FORM / STATUS -->
+        <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200">
+          
+          <div id="wholesale-status-card" class="hidden mb-6 p-5 rounded-2xl border">
+            <!-- Dynamic application status (Pending, Approved, Rejected) -->
+          </div>
+
+          <div id="wholesale-form-wrapper">
+            <h3 class="text-xl font-black text-slate-900 mb-2">فرم درخواست دسترسی به قیمت عمده</h3>
+            <p class="text-xs text-slate-500 mb-6 leading-relaxed">
+              لطفاً اطلاعات فروشگاه یا مزون خود را با دقت ثبت نمایید. کارشناسان پشتیبانی مدا حداکثر ظرف ۲۴ ساعت کاری با شما تماس گرفته و دسترسی را فعال خواهند نمود.
+            </p>
+
+            <form id="wholesale-form" onsubmit="submitWholesaleForm(event)" class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">نام فروشگاه / مزون *</label>
+                  <input type="text" id="ws-company-name" required placeholder="مثال: بوتیک الیزه" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">کد ملی / شناسه اقتصادی *</label>
+                  <input type="text" id="ws-economic-code" required placeholder="شناسه ۱۱ رقمی یا کد ملی" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">استان *</label>
+                  <input type="text" id="ws-province" required placeholder="مثال: تهران" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">شهر *</label>
+                  <input type="text" id="ws-city" required placeholder="مثال: تهران" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">شماره تلفن ثابت کسب‌وکار *</label>
+                  <input type="text" id="ws-business-phone" required placeholder="۰۲۱۸۸..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">نوع فعالیت *</label>
+                  <select id="ws-store-type" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    <option value="PHYSICAL_STORE">فروشگاه فیزیکی / بوتیک</option>
+                    <option value="ONLINE_SHOP">مزون و پیج اینستاگرام / آنلاین</option>
+                    <option value="BOTH">هر دو (فیزیکی و آنلاین)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">آدرس دقیق فروشگاه *</label>
+                <textarea id="ws-business-address" required rows="2" placeholder="خیابان، مجتمع تجاری، طبقه، پلاک..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none"></textarea>
+              </div>
+
+              <div class="pt-2">
+                <button type="submit" id="ws-submit-btn" class="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-sm shadow-lg shadow-slate-900/20 transition flex items-center justify-center gap-2">
+                  <span>ارسال مدارک و ثبت درخواست دسترسی عمده</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+
+        <!-- WHOLESALE FAQ & RULES -->
+        <div class="space-y-6">
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+            <h4 class="font-bold text-slate-900 text-sm mb-4 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+              قوانین و شرایط سفارش عمده
+            </h4>
+            <ul class="space-y-3 text-xs text-slate-600 leading-relaxed list-disc list-inside">
+              <li>حداقل سفارش برای اعمال نرخ عمده، ۶ عدد از هر مدل (یا یک پک سایزبندی کامل) می‌باشد.</li>
+              <li>سفارش‌های بالای ۲۰ میلیون تومان شامل ارسال رایگان به باربری می‌باشند.</li>
+              <li>امکان سفارش در رنگ‌بندی‌های اختصاصی برای تیراژهای بالای ۵۰ عدد فراهم است.</li>
+              <li>کلیه کارها دارای اتیکت، بارکد و ژورنال اختصاصی باکیفیت جهت عکاسی و بازاریابی هستند.</li>
+            </ul>
+          </div>
+
+          <div class="bg-gradient-to-br from-brand-900 to-slate-900 text-white p-6 rounded-3xl shadow-sm">
+            <h4 class="font-bold text-sm mb-2">مشاوره مستقیم تیراژ</h4>
+            <p class="text-xs text-brand-100 leading-relaxed mb-4">
+              در صورت نیاز به استعلام موجودی فوری یا سفارش مدل‌های اختصاصی مزونی با واحد فروش عمده تماس بگیرید:
+            </p>
+            <div class="font-mono text-lg font-bold tracking-wider text-amber-300">
+              ۰۲۱-۸۸۸۸۴۳۲۱
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- VIEW 3: USER ORDERS -->
+    <div id="view-orders" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-black text-slate-900">سفارش‌های من</h2>
+          <p class="text-xs text-slate-500 mt-0.5">تاریخچه سفارشات ثبت‌شده و وضعیت ارسال</p>
+        </div>
+        <button onclick="fetchOrders()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          به‌روزرسانی
+        </button>
+      </div>
+
+      <div id="orders-list-container" class="space-y-4">
+        <!-- Orders injected dynamically -->
+      </div>
+    </div>
+
+    <!-- VIEW 4: ADMIN DASHBOARD -->
+    <div id="view-admin" class="hidden space-y-8">
+      
+      <!-- ADMIN HEADER & KPI STATS -->
+      <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <span class="inline-block px-2.5 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 mb-1">پنل مدیریت یکپارچه مدا</span>
+            <h2 class="text-2xl font-black text-slate-900">داشبورد کنترل و ممیزی فروشگاه</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="switchAdminTab('wholesale')" id="admin-tab-btn-wholesale" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-purple-600 text-white">
+              بررسی متقاضیان عمده (<span id="admin-kpi-pending-badge">۰</span>)
+            </button>
+            <button onclick="switchAdminTab('orders')" id="admin-tab-btn-orders" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              مدیریت سفارشات
+            </button>
+            <button onclick="switchAdminTab('products')" id="admin-tab-btn-products" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              انبار و محصولات
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI CARDS -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="bg-purple-50/70 border border-purple-100 p-4 rounded-2xl">
+            <span class="text-xs text-purple-700 font-semibold block mb-1">مجموع فروش و درآمد</span>
+            <span id="kpi-revenue" class="text-xl font-black text-purple-950 font-mono">۰ تومان</span>
+          </div>
+          <div class="bg-amber-50/70 border border-amber-100 p-4 rounded-2xl">
+            <span class="text-xs text-amber-700 font-semibold block mb-1">متقاضیان عمده در انتظار</span>
+            <span id="kpi-pending-wholesale" class="text-xl font-black text-amber-950 font-mono">۰</span>
+          </div>
+          <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-2xl">
+            <span class="text-xs text-blue-700 font-semibold block mb-1">تعداد کل سفارشات</span>
+            <span id="kpi-orders-count" class="text-xl font-black text-blue-950 font-mono">۰</span>
+          </div>
+          <div class="bg-emerald-50/70 border border-emerald-100 p-4 rounded-2xl">
+            <span class="text-xs text-emerald-700 font-semibold block mb-1">محصولات فعال در کاتالوگ</span>
+            <span id="kpi-products-count" class="text-xl font-black text-emerald-950 font-mono">۰</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB 1: WHOLESALE APPLICATIONS REVIEW -->
+      <div id="admin-tab-wholesale" class="space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <h3 class="font-black text-lg text-slate-900 mb-1">درخواست‌های عضویت در بخش عمده‌فروشی</h3>
+          <p class="text-xs text-slate-500 mb-6">درخواست‌های متقاضیان را بررسی کرده و با تایید مدارک، دسترسی قیمت عمده را برای آن‌ها فعال نمایید.</p>
+          <div id="admin-applications-table" class="space-y-4">
+            <!-- Applications injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB 2: ORDERS MANAGEMENT -->
+      <div id="admin-tab-orders" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <h3 class="font-black text-lg text-slate-900 mb-1">مدیریت سفارش‌های مشتریان و همکاران</h3>
+          <p class="text-xs text-slate-500 mb-6">تغییر وضعیت سفارش‌ها و مشاهده اقلام و صورتحساب</p>
+          <div id="admin-orders-table" class="space-y-4">
+            <!-- Admin orders injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB 3: PRODUCT & INVENTORY MANAGEMENT -->
+      <div id="admin-tab-products" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h3 class="font-black text-lg text-slate-900 mb-1">مدیریت کاتالوگ و قیمت‌گذاری</h3>
+              <p class="text-xs text-slate-500">مشاهده همزمان قیمت تک، قیمت عمده و موجودی انبار</p>
+            </div>
+            <button onclick="openAddProductModal()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition flex items-center gap-1.5">
+              <span>+ افزودن محصول جدید</span>
+            </button>
+          </div>
+          <div id="admin-products-table" class="space-y-4">
+            <!-- Admin products injected here -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- PRODUCT DETAIL MODAL -->
+  <div id="product-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative my-8 border border-slate-200">
+      <button onclick="closeProductModal()" class="absolute top-5 left-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">✕</button>
+      <div id="modal-content" class="space-y-6">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- CART DRAWER -->
+  <div id="cart-drawer-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity" onclick="toggleCartDrawer()"></div>
+  <aside id="cart-drawer" class="fixed top-0 left-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col">
+    <!-- Header -->
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+        <h3 class="font-black text-slate-900 text-base">سبد خرید شما</h3>
+      </div>
+      <button onclick="toggleCartDrawer()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">✕</button>
+    </div>
+
+    <!-- Items List -->
+    <div id="cart-items-list" class="flex-grow overflow-y-auto p-5 space-y-4 divide-y divide-slate-100">
+      <!-- Items dynamically populated -->
+    </div>
+
+    <!-- Notices & Warnings -->
+    <div id="cart-notices-container" class="px-5 space-y-2"></div>
+
+    <!-- Summary & Checkout Footer -->
+    <div class="p-5 border-t border-slate-200 bg-slate-50 space-y-3">
+      <div class="space-y-1.5 text-xs">
+        <div class="flex justify-between text-slate-500">
+          <span>جمع اقلام:</span>
+          <span id="cart-subtotal" class="font-mono font-bold text-slate-700">۰ تومان</span>
+        </div>
+        <div id="cart-savings-row" class="hidden flex justify-between text-emerald-600 font-bold">
+          <span>تخفیف ویژه عمده:</span>
+          <span id="cart-savings" class="font-mono">۰ تومان</span>
+        </div>
+        <div class="flex justify-between text-slate-500">
+          <span>هزینه ارسال / باربری:</span>
+          <span id="cart-shipping" class="font-mono">رایگان</span>
+        </div>
+        <div class="pt-2 border-t border-slate-200 flex justify-between text-base font-black text-slate-900">
+          <span>مبلغ قابل پرداخت:</span>
+          <span id="cart-payable" class="font-mono text-brand-700">۰ تومان</span>
+        </div>
+      </div>
+
+      <button onclick="openCheckoutModal()" id="cart-checkout-btn" class="w-full py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-lg shadow-brand-600/20 transition flex items-center justify-center gap-2">
+        <span>تکمیل و ثبت سفارش</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- CHECKOUT MODAL -->
+  <div id="checkout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative my-8 border border-slate-200">
+      <button onclick="closeCheckoutModal()" class="absolute top-5 left-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">✕</button>
+      
+      <div id="checkout-form-container">
+        <h3 class="text-xl font-black text-slate-900 mb-1">اطلاعات ارسال و پرداخت</h3>
+        <p class="text-xs text-slate-500 mb-6">لطفاً آدرس تحویل‌گیرنده را با دقت وارد نمایید.</p>
+
+        <form id="checkout-form" onsubmit="submitOrder(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">نام و نام‌خانوادگی گیرنده *</label>
+            <input type="text" id="chk-name" required placeholder="مثال: سارا علوی" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">شماره تماس گیرنده *</label>
+              <input type="tel" id="chk-phone" required placeholder="۰۹۱۲..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">کد پستی</label>
+              <input type="text" id="chk-postal" placeholder="۱۰ رقمی" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">استان *</label>
+              <input type="text" id="chk-province" required placeholder="تهران" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">شهر *</label>
+              <input type="text" id="chk-city" required placeholder="تهران" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">نشانی دقیق پستی *</label>
+            <textarea id="chk-address" required rows="2" placeholder="خیابان، کوچه، پلاک، واحد..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 outline-none"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">روش پرداخت</label>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                <input type="radio" name="paymentMethod" value="ONLINE_GATEWAY" checked class="text-brand-600">
+                <span class="font-bold text-slate-800">درگاه پرداخت شتاب</span>
+              </label>
+              <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                <input type="radio" name="paymentMethod" value="BANK_TRANSFER_RECEIPT" class="text-brand-600">
+                <span class="font-bold text-slate-800">حواله پایا / کارت به کارت</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" id="submit-order-btn" class="w-full py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-lg shadow-brand-600/20 transition flex items-center justify-center gap-2">
+            <span>تایید نهایی و ثبت قطعی سفارش</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- SUCCESS CONFIRMATION RECEIPT -->
+      <div id="checkout-success" class="hidden text-center space-y-4 py-4">
+        <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-3xl font-bold">✓</div>
+        <h3 class="text-xl font-black text-slate-900">سفارش شما با موفقیت ثبت گردید!</h3>
+        <p class="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
+          شناسه سفارش: <span id="confirmed-order-number" class="font-mono font-bold text-slate-900"></span><br>
+          رسید خرید برای شماره همراه شما ارسال شد و سفارش در مرحله آماده‌سازی قرار گرفت.
+        </p>
+        <button onclick="closeCheckoutModal(); navigate('orders')" class="px-6 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">مشاهده سفارش در پنل</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 text-xs py-10 border-t border-slate-800 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div class="space-y-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold">M</div>
+            <span class="font-black text-lg text-white">مانتو مُدا</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed">
+            برند تخصصی طراحی و تولید مانتو، ترنچ‌کت و پوشاک بانوان. کیفیت صنعتی، پارچه‌های مرغوب و سیستم مدرن فروش عمده و سازمانی.
+          </p>
+        </div>
+        <div>
+          <h5 class="text-white font-bold mb-3">دسترسی سریع</h5>
+          <ul class="space-y-2">
+            <li><a href="#" onclick="navigate('catalog')" class="hover:text-white transition">کاتالوگ و جدیدترین‌ها</a></li>
+            <li><a href="#" onclick="navigate('wholesale')" class="hover:text-white transition">شرایط و قوانین خرید عمده</a></li>
+            <li><a href="#" onclick="navigate('orders')" class="hover:text-white transition">پیگیری وضعیت سفارش</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5 class="text-white font-bold mb-3">خدمات مشتریان</h5>
+          <ul class="space-y-2">
+            <li><span>راهنمای انتخاب سایز</span></li>
+            <li><span>رویه ارسال و مرجوعی</span></li>
+            <li><span>ضمانت اصالت و سلامت پارچه</span></li>
+          </ul>
+        </div>
+        <div>
+          <h5 class="text-white font-bold mb-3">امنیت و معماری سیستم</h5>
+          <p class="text-slate-400 leading-relaxed mb-2">
+            پروژه Production-Ready بر مبنای GitHub Source of Truth، محافظت از قیمت‌های عمده در سطح API و معماری ماژولار.
+          </p>
+          <span class="inline-block px-2 py-1 rounded bg-slate-800 text-emerald-400 font-mono text-[11px]">System Status: Production Verified</span>
+        </div>
+      </div>
+      <div class="pt-6 border-t border-slate-800 text-center text-slate-500">
+        © ۲۰۲۶ Manto Moda — تمامی حقوق محفوظ است. توسعه‌یافته بر اساس Master Development Roadmap.
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

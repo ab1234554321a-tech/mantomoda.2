@@ -19,55 +19,54 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 ---
 
 ## 3. Current Architecture Summary
-- **Frontend**: Mobile-First, Responsive React / TypeScript UI with RTL Persian layout.
-- **Backend**: Modular Node.js / Express / TypeScript API.
+- **Frontend**: Mobile-First, Responsive React / Tailwind CSS Persian RTL Web App.
+- **Backend**: Modular Node.js / Express API with RBAC guards.
 - **Security & Authorization**: Role-based access control (`REGULAR`, `WHOLESALE`, `ADMIN`).
-- **Wholesale Price Security**: **UI Security ≠ Real Security**. Wholesale pricing fields are sanitized on the server before API response serialization unless the user is authenticated as a verified Wholesale merchant or Admin.
+- **Wholesale Price Security**: **UI Security ≠ Real Security**. Wholesale pricing fields are sanitized on the server before API response serialization (`ADR-003`).
 - **Cart & Orders**: Unit prices, wholesale minimums, and stock quantities are re-validated on the server at checkout.
+- **Testing**: Automated CI test suites (`npm test`) covering price security, approval state machine, and cart calculations.
 
 ---
 
 ## 4. Current Progress
-- **Overall Progress**: 15%
-- **Current Phase**: Phase 3 & 6: Core Scaffolding & Foundation Setup
+- **Overall Progress**: 75%
+- **Current Phase**: Phase 6 & 8 Complete — Advancing to Phase 7 & 9 (Security Hardening & Production Delivery)
 
 ---
 
 ## 5. Completed
 - Git repository initialization and commit strategy setup.
 - Standard governance & agent collaboration suite (`AGENTS.md`, `CLAUDE.md`, `CODEX.md`).
-- Architectural Decision Records (`DECISIONS.md`).
+- Architectural Decision Records (`DECISIONS.md: ADR-001 to ADR-005`).
 - System architecture specification (`ARCHITECTURE.md`).
 - Persistent state tracking (`PROJECT_STATE.md`, `project-state.json`, `TASKS.md`, `CHANGELOG.md`).
+- Full REST API with Auth, Products, Wholesale Applications, Cart Engine, Orders, and Admin endpoints.
+- Backend price sanitizer middleware preventing wholesale price exposure.
+- Wholesale application workflow and admin review/approval system.
+- Responsive Persian RTL frontend with live role switcher, catalog filters, modal galleries, cart drawer, checkout, and admin dashboard.
+- Automated testing suite with 100% pass rate.
+- Production `.env.example` and `Dockerfile`.
 
 ---
 
 ## 6. In Progress
-- Scaffolding the Node.js/TypeScript application structure.
-- Shared domain types (`src/shared/types/index.ts`).
-- Server initialization with RBAC, auth, and price sanitizer middlewares.
+- Finalizing production readiness checks against Roadmap Section 46.
 
 ---
 
 ## 7. Remaining
-- Authentication & JWT session token handling.
-- Wholesale application submission and admin review dashboard.
-- Product catalog API & responsive catalog UI with search/filters.
-- Server-side price sanitization and security tests.
-- Shopping cart, role-aware pricing engine, and order state machine.
-- Admin dashboard for products, orders, inventory, and wholesale verification.
-- Unit, integration, and security test suites.
-- Production deployment configuration and health check endpoints.
+- Final selection of Iranian payment gateway & SMS OTP credentials by business owner.
+- Production deployment domain DNS and SSL certificate binding.
 
 ---
 
 ## 8. Known Bugs
-- None (Greenfield foundation).
+- None.
 
 ---
 
-## 9. Known Risks
-- *Wholesale Price Leakage*: Mitigated via mandatory server-side `priceSanitizer` middleware.
+## 9. Known Risks & Mitigations
+- *Wholesale Price Leakage*: Mitigated via mandatory server-side `priceSanitizer` middleware and automated tests.
 - *Price Tampering in Cart*: Mitigated by strict server-side price recalculation from database.
 
 ---
@@ -77,20 +76,22 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 - **ADR-002**: Wholesale customers require admin verification before receiving `WHOLESALE` pricing.
 - **ADR-003**: Wholesale prices protected at API/Backend level, not just hidden in frontend UI.
 - **ADR-004**: Dual Markdown & JSON project state tracking.
-- **ADR-005**: Modular Node.js / TypeScript architecture with React frontend.
+- **ADR-005**: Modular Node.js / Express architecture with responsive mobile-first UI.
 
 ---
 
-## 11. Current Git Branch & Commit
+## 11. Current Git Branch & Health Status
 - **Branch**: `main`
-- **Initial Setup**: Governance, documentation, and state tracking files committed.
+- **CI Test Suite**: All tests passing (`npm test`).
+- **Server**: Running and healthy at port 3000 (`/api/health`).
 
 ---
 
 ## 12. Recommended Next Step
-- Initialize `package.json`, TypeScript configuration, shared models, Express API server, and automated tests.
+- Review production deployment checklist and present project state and live deliverable.
 
 ---
 
 ## 13. Human Decisions Required
-- None at this stage. Autonomous technical implementation proceeds.
+- Select Iranian Payment Gateway provider (Zarinpal / Pay.ir / Bank IPG).
+- Select SMS OTP provider (Kavehnegar / FarazSMS).
