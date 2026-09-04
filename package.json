@@ -13,7 +13,8 @@
     "agent:radar": "node skills/manto-radar.js",
     "agent:research": "node skills/design-research.js",
     "agent:sync": "node skills/state-sync.js",
-    "agent:all": "node skills/orchestrator.js"
+    "agent:all": "node skills/orchestrator.js",
+    "agent:benchmark": "node research/benchmarks/compare-reference-sites.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
