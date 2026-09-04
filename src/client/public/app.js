@@ -5,15 +5,8 @@
 
 // Application State
 const state = {
-  currentUser: {
-    id: "usr-retail-01",
-    email: "neda.alavi@gmail.com",
-    phone: "09123333333",
-    fullName: "ندا علوی",
-    role: "REGULAR",
-    isWholesaleVerified: false
-  },
-  token: "token_usr-retail-01",
+  currentUser: null,
+  token: null,
   products: [],
   categories: [],
   cart: JSON.parse(localStorage.getItem('mm_cart') || '[]'),
@@ -39,12 +32,11 @@ function toPersianDigits(n) {
   return n.toString().replace(/\d/g, (x) => farsiDigits[x]);
 }
 
-// Helper: API Client with Auth headers
+// Helper: API Client with Auth headers (Enforces cryptographic JWT only, zero header spoofing)
 async function apiFetch(url, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...(state.token ? { 'Authorization': `Bearer ${state.token}` } : {}),
-    ...(state.currentUser ? { 'x-user-id': state.currentUser.id } : {}),
     ...options.headers
   };
 
@@ -1033,6 +1025,15 @@ document.getElementById('header-search-input')?.addEventListener('input', (e) =>
 // App Initialization
 async function initApp() {
   await setupRoleSwitcher();
+  // Initialize with regular customer session
+  const initialRoleRes = await apiFetch('/api/auth/switch-role', {
+    method: 'POST',
+    body: JSON.stringify({ targetRole: 'REGULAR' })
+  });
+  if (initialRoleRes.success) {
+    state.token = initialRoleRes.data.token;
+    state.currentUser = initialRoleRes.data.user;
+  }
   updateUserProfileUI();
   updateCartBadge();
   await fetchCategories();

@@ -1,11 +1,12 @@
 /**
  * Skill: Security Guard & Penetration Tester (محافظ و ممیز امنیتی)
- * Automatically tests RBAC guards, Price isolation, and price tampering vulnerabilities.
+ * Automatically tests RBAC guards, Price isolation, JWT verification, and price tampering vulnerabilities.
  */
 
 import assert from 'assert';
 import { db } from '../src/server/db/store.js';
-import { sanitizeProductForUser, sanitizeProductListForUser } from '../src/server/middlewares/price-sanitizer.js';
+import { sanitizeProductForUser } from '../src/server/middlewares/price-sanitizer.js';
+import { signToken, verifyToken, comparePassword, hashPassword } from '../src/server/utils/auth-crypto.js';
 
 console.log('====================================================');
 console.log('🛡️ MANTO MODA — AUTONOMOUS SECURITY GUARD SKILL 🛡️');
@@ -41,11 +42,9 @@ try {
 
   // Test 4: Price Tampering Resilience (Server-Side Recalculation)
   console.log('\n[Security Gate 4] Testing Cart & Order Price Tampering Resilience...');
-  // Simulating client submitting malicious price of 100 Tomans
   const maliciousCartItem = { productId: 'prod-001', variantId: 'var-001-1', quantity: 2, clientGivenPrice: 100 };
   const dbProduct = db.findProductById(maliciousCartItem.productId);
   
-  // Real server calculation ignores clientGivenPrice and uses dbProduct.retailPrice
   const serverCalculatedUnitPrice = dbProduct.retailPrice;
   const serverTotal = serverCalculatedUnitPrice * maliciousCartItem.quantity;
   
@@ -62,11 +61,24 @@ try {
   console.log('  ✔ Passed: Verified wholesale merchants receive legitimate wholesale pricing.');
   testsPassed++;
 
+  // Test 6: Cryptographic JWT Integrity & Anti-Spoofing
+  console.log('\n[Security Gate 6] Testing Cryptographic JWT Signature & Anti-Spoofing...');
+  const token = signToken(retailUser);
+  const verified = verifyToken(token);
+  assert.ok(verified, 'Signed token must be verified');
+  assert.strictEqual(verified.id, retailUser.id);
+
+  const tamperedToken = token.slice(0, -6) + 'XXXXXX';
+  assert.strictEqual(verifyToken(tamperedToken), null, 'Tampered token must be rejected');
+  console.log('  ✔ Passed: JWT tokens are cryptographically secured against spoofing.');
+  testsPassed++;
+
   console.log('\n====================================================');
   console.log(`🎉 ALL ${testsPassed} SECURITY GATES PASSED WITH ZERO VULNERABILITIES!`);
   console.log('✔ Price Leakage: ZERO');
   console.log('✔ Privilege Escalation: PROTECTED');
   console.log('✔ Tampering Resistance: VERIFIED');
+  console.log('✔ JWT Cryptography: SECURED');
   console.log('====================================================\n');
   process.exit(0);
 } catch (error) {

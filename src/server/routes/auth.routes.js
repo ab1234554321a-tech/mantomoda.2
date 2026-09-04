@@ -1,42 +1,45 @@
 import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
+import { hashPassword, comparePassword, signToken } from '../utils/auth-crypto.js';
 
 const router = Router();
 
-// Login
-router.post('/login', (req, res) => {
+// Login with Email/Phone & Password verification
+router.post('/login', async (req, res) => {
   const { identifier, password } = req.body;
 
-  if (!identifier) {
+  if (!identifier || !password) {
     return res.status(400).json({
       success: false,
       error: 'MISSING_FIELDS',
-      message: 'لطفاً ایمیل یا شماره موبایل خود را وارد کنید.'
+      message: 'لطفاً ایمیل یا شماره موبایل و رمز عبور خود را وارد کنید.'
     });
   }
 
-  // Find by email or phone
-  let user = db.findUserByEmail(identifier) || db.findUserByPhone(identifier);
+  // Find user by email or phone
+  const user = db.findUserByEmail(identifier) || db.findUserByPhone(identifier);
 
-  // If user not found, create a demo user if mock password provided
   if (!user) {
     return res.status(401).json({
       success: false,
       error: 'INVALID_CREDENTIALS',
-      message: 'کاربری با این مشخصات یافت نشد.'
+      message: 'کاربری با این مشخصات یافت نشد یا اطلاعات ورود نادرست است.'
     });
   }
 
-  if (password && password !== user.password && user.password) {
+  // Secure Password Verification (bcrypt)
+  const isMatch = await comparePassword(password, user.passwordHash);
+  if (!isMatch) {
     return res.status(401).json({
       success: false,
-      error: 'INVALID_PASSWORD',
-      message: 'رمز عبور وارد شده نادرست است.'
+      error: 'INVALID_CREDENTIALS',
+      message: 'اطلاعات ورود یا رمز عبور وارد شده نادرست است.'
     });
   }
 
-  const token = `token_${user.id}`;
+  // Generate Cryptographic JWT Token
+  const token = signToken(user);
 
   res.json({
     success: true,
@@ -56,8 +59,8 @@ router.post('/login', (req, res) => {
   });
 });
 
-// Register
-router.post('/register', (req, res) => {
+// Register with Password Hashing
+router.post('/register', async (req, res) => {
   const { fullName, email, phone, password } = req.body;
 
   if (!fullName || !phone || !password) {
@@ -65,6 +68,14 @@ router.post('/register', (req, res) => {
       success: false,
       error: 'MISSING_FIELDS',
       message: 'نام و نام خانوادگی، شماره موبایل و رمز عبور الزامی است.'
+    });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      error: 'WEAK_PASSWORD',
+      message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.'
     });
   }
 
@@ -84,15 +95,20 @@ router.post('/register', (req, res) => {
     });
   }
 
+  // Hash Password with bcrypt salt
+  const passwordHash = await hashPassword(password);
+
   const newUser = db.createUser({
     fullName,
     email: email || `${phone}@manto-moda.ir`,
     phone,
-    password,
-    role: 'REGULAR'
+    passwordHash,
+    role: 'REGULAR',
+    isWholesaleVerified: false
   });
 
-  const token = `token_${newUser.id}`;
+  // Generate signed JWT token
+  const token = signToken(newUser);
 
   res.status(201).json({
     success: true,
@@ -119,7 +135,7 @@ router.get('/me', requireAuth, (req, res) => {
   });
 });
 
-// Switch Role Demo Endpoint (For fast multi-perspective testing)
+// Switch Role Simulator Endpoint (Issues real cryptographic signed JWTs for selected roles)
 router.post('/switch-role', (req, res) => {
   const { targetRole } = req.body; // 'GUEST', 'REGULAR', 'WHOLESALE', 'PENDING', 'ADMIN'
 
@@ -152,10 +168,13 @@ router.post('/switch-role', (req, res) => {
     });
   }
 
+  // Issue real cryptographically signed JWT for the switched role
+  const token = signToken(targetUser);
+
   res.json({
     success: true,
     data: {
-      token: `token_${targetUser.id}`,
+      token,
       user: {
         id: targetUser.id,
         email: targetUser.email,

@@ -1,9 +1,10 @@
 import assert from 'assert';
 import { db } from '../src/server/db/store.js';
 import { sanitizeProductForUser, sanitizeProductListForUser } from '../src/server/middlewares/price-sanitizer.js';
+import { signToken, verifyToken, comparePassword, hashPassword } from '../src/server/utils/auth-crypto.js';
 
 export async function runSecurityTests() {
-  console.log('\n🔒 Running Security & Price Protection Tests (ADR-003)...');
+  console.log('\n🔒 Running Security, JWT Crypto & Price Protection Tests (ADR-003)...');
 
   const sampleProduct = db.findProductById('prod-001');
   assert.ok(sampleProduct, 'Sample product should exist in DB');
@@ -48,4 +49,33 @@ export async function runSecurityTests() {
   const leakedProducts = guestList.filter(p => p.wholesalePrice !== undefined);
   assert.strictEqual(leakedProducts.length, 0, 'Zero products should leak wholesalePrice in product listing');
   console.log('  ✔ Passed: List sanitization verified with 0 price leaks across all catalog items.');
+
+  // Test 7: Cryptographic JWT Signature & Expiration Verification
+  console.log('\n[Security Gate 7] Testing Cryptographic JWT Token Signing & Verification...');
+  const signedToken = signToken(retailUser);
+  assert.ok(typeof signedToken === 'string' && signedToken.split('.').length === 3, 'Token must be valid 3-part JWT string');
+  
+  const verifiedPayload = verifyToken(signedToken);
+  assert.ok(verifiedPayload, 'Valid token must be verified');
+  assert.strictEqual(verifiedPayload.id, retailUser.id, 'Token payload must contain user ID');
+  assert.strictEqual(verifiedPayload.role, retailUser.role, 'Token payload must contain user Role');
+
+  // Test 8: Tampered JWT Token Rejection
+  const tamperedToken = signedToken.slice(0, -5) + 'AAAAA';
+  const tamperedResult = verifyToken(tamperedToken);
+  assert.strictEqual(tamperedResult, null, 'Tampered token signature MUST be rejected');
+  console.log('  ✔ Passed: Cryptographic JWT signature and anti-tampering verified.');
+
+  // Test 9: Password Hashing Verification (bcrypt)
+  console.log('\n[Security Gate 9] Testing bcrypt Password Hashing & Verification...');
+  const testPlainPassword = 'MySecurePassword2026!';
+  const hashedPassword = await hashPassword(testPlainPassword);
+  assert.notStrictEqual(testPlainPassword, hashedPassword, 'Hash must not equal plain text');
+  
+  const isMatchValid = await comparePassword(testPlainPassword, hashedPassword);
+  assert.strictEqual(isMatchValid, true, 'Valid password must match hash');
+
+  const isMatchInvalid = await comparePassword('WrongPassword123', hashedPassword);
+  assert.strictEqual(isMatchInvalid, false, 'Invalid password must be rejected');
+  console.log('  ✔ Passed: bcrypt password hashing and verification verified.');
 }

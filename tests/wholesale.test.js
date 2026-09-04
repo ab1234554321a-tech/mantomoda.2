@@ -4,13 +4,14 @@ import { db } from '../src/server/db/store.js';
 export async function runWholesaleTests() {
   console.log('\n💼 Running Wholesale Workflow & Approval Tests (ADR-002)...');
 
-  // Create a new applicant user
+  // Create a new applicant user with bcrypt password hash
   const applicant = db.createUser({
     fullName: 'تست مزون باران',
     email: 'baran.mezon@test.com',
     phone: '09359998877',
-    password: 'password123',
-    role: 'REGULAR'
+    passwordHash: '$2b$10$wJXLH55mz5NJv9Wn8Xf3d.60TV1AaOSMnCLLMinO5fEau5Yn/fe.W',
+    role: 'REGULAR',
+    isWholesaleVerified: false
   });
 
   assert.strictEqual(applicant.role, 'REGULAR');

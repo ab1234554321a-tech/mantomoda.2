@@ -1,4 +1,6 @@
-// Seed Data for Manto Moda Platform
+// Seed Data for Manto Moda Platform (Secure Hashes via bcrypt)
+
+const DEFAULT_HASHED_PASSWORD = "$2b$10$wJXLH55mz5NJv9Wn8Xf3d.60TV1AaOSMnCLLMinO5fEau5Yn/fe.W"; // Hashed "password123"
 
 export const SEED_USERS = [
   {
@@ -8,7 +10,7 @@ export const SEED_USERS = [
     fullName: "مدیریت فروشگاه مدا",
     role: "ADMIN",
     isWholesaleVerified: true,
-    password: "password123", // In production, bcrypt hashed
+    passwordHash: DEFAULT_HASHED_PASSWORD,
     createdAt: "2026-08-01T10:00:00Z"
   },
   {
@@ -18,7 +20,7 @@ export const SEED_USERS = [
     fullName: "خانم سارا راد (بوتیک الیزه)",
     role: "WHOLESALE",
     isWholesaleVerified: true,
-    password: "password123",
+    passwordHash: DEFAULT_HASHED_PASSWORD,
     companyName: "بوتیک الیزه ونک",
     economicCode: "41159876231",
     businessAddress: "تهران، میدان ونک، مرکز تجاری آسمان، طبقه اول، پلاک ۴۲",
@@ -31,7 +33,7 @@ export const SEED_USERS = [
     fullName: "ندا علوی",
     role: "REGULAR",
     isWholesaleVerified: false,
-    password: "password123",
+    passwordHash: DEFAULT_HASHED_PASSWORD,
     createdAt: "2026-08-15T14:20:00Z"
   },
   {
@@ -41,7 +43,7 @@ export const SEED_USERS = [
     fullName: "مریم حسینی (مزون شیراز)",
     role: "REGULAR",
     isWholesaleVerified: false,
-    password: "password123",
+    passwordHash: DEFAULT_HASHED_PASSWORD,
     companyName: "مزون شیراز شیک",
     economicCode: "98765432100",
     businessAddress: "شیراز، خیابان عفیف‌آباد، مجتمع سپهر، واحد ۱۲",

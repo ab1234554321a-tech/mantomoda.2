@@ -32,8 +32,8 @@ class DataStore {
       phone: userData.phone,
       fullName: userData.fullName,
       role: userData.role || 'REGULAR',
-      isWholesaleVerified: false,
-      password: userData.password,
+      isWholesaleVerified: Boolean(userData.isWholesaleVerified),
+      passwordHash: userData.passwordHash,
       createdAt: new Date().toISOString()
     };
     this.users.push(newUser);

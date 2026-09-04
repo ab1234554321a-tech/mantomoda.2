@@ -1,55 +1,58 @@
 import { db } from '../db/store.js';
+import { verifyToken } from '../utils/auth-crypto.js';
 
-// Auth middleware extracting user from Authorization header or session token
+/**
+ * Global Authentication Context Extractor
+ * 
+ * SECURITY FIX:
+ * 1. COMPLETELY REMOVED `x-user-id` header to eliminate user impersonation & spoofing vulnerabilities.
+ * 2. Enforces cryptographically signed and verifiable HMAC-SHA256 JWT tokens.
+ */
 export function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
-  const sessionUserId = req.headers['x-user-id'];
-
-  let userId = null;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    // Decode simulated token formatted as `token_<userId>`
-    if (token.startsWith('token_')) {
-      userId = token.replace('token_', '');
-    } else {
-      userId = token;
-    }
-  } else if (sessionUserId) {
-    userId = sessionUserId;
-  }
+    const token = authHeader.substring(7).trim();
 
-  if (userId) {
-    const user = db.findUserById(userId);
-    if (user) {
-      req.user = {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        fullName: user.fullName,
-        role: user.role,
-        isWholesaleVerified: user.isWholesaleVerified,
-        companyName: user.companyName || ''
-      };
+    if (token) {
+      const decoded = verifyToken(token);
+      if (decoded && decoded.id) {
+        const user = db.findUserById(decoded.id);
+        if (user) {
+          req.user = {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+            fullName: user.fullName,
+            role: user.role,
+            isWholesaleVerified: Boolean(user.isWholesaleVerified),
+            companyName: user.companyName || ''
+          };
+        }
+      }
     }
   }
 
   next();
 }
 
-// Require authenticated user
+/**
+ * Guard middleware requiring authenticated user
+ */
 export function requireAuth(req, res, next) {
   if (!req.user) {
     return res.status(401).json({
       success: false,
       error: 'UNAUTHORIZED',
-      message: 'لطفاً ابتدا وارد حساب کاربری خود شوید.'
+      message: 'توکن نامعتبر است یا منقضی شده است. لطفاً ابتدا وارد حساب کاربری خود شوید.'
     });
   }
   next();
 }
 
-// Require specific role(s)
+/**
+ * Guard middleware requiring specific role(s)
+ */
 export function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
