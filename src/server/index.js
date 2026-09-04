@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -92,7 +93,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     project: 'Manto Moda',
-    version: '0.2.0-beta',
+    version: '0.3.0-rc1',
     environment: process.env.NODE_ENV || 'development',
     uptimeSeconds: Math.floor(process.uptime()),
     memory: {
