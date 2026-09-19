@@ -79,3 +79,51 @@ This log contains the record of all major architectural and technical decisions 
   - When unset (default, and always in production) behaviour is unchanged: `frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`.
   - `frameguard` is disabled **only** when `CSP_FRAME_ANCESTORS` is explicitly set, because `X-Frame-Options` would otherwise override the widened CSP.
 - **Consequences**: Embedding is opt-in per environment, is auditable via env config, and cannot be widened accidentally. Documented in `.env.example` with an explicit "never use `*` in production" warning. All 4 test suites re-verified green after the change.
+
+---
+
+## ADR-008: Iranian Payment Gateway Provider — Zarinpal (Pluggable Adapter)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `BL-006` required a real IPG. Two families were evaluated:
+  **direct bank PSP** (Behpardakht Mellat / Saman SEP) and **intermediary IPG** (Zarinpal, Pay.ir).
+  - Direct PSP: banking-grade settlement straight to the merchant account, but requires a Shaparak
+    terminal, company/IEEE documents, a tax file and a slow approval cycle. Integration differs per bank.
+  - Zarinpal: activation without a bank contract, one documented REST API, a sandbox for integration
+    testing, and — decisive for reliability — **smart routing across multiple bank gateways**, so a
+    single bank outage does not take checkout down.
+- **Decision**: Adopt **Zarinpal** as the default IPG, implemented behind a **pluggable provider
+  adapter** (`src/server/services/payment/`). Selection is one variable: `PAYMENT_PROVIDER`.
+  - Amounts are stored and displayed in **Toman** and converted to **Rial** (×10) inside the Zarinpal
+    adapter only — the single most common source of Iranian payment bugs.
+  - The amount charged is always re-read from the stored order; it is never taken from the request.
+  - Verification is **idempotent** (status `101` from Zarinpal is treated as already-verified, not as a
+    second charge) and the order flips to `PAID` only after successful verification.
+  - Orders are created `paymentStatus: PENDING`; the previous hardcoded simulated `PAID` is removed.
+  - In production the app **refuses to start** with an unset or unconfigured provider so payments can
+    never be silently faked. `mock` requires an explicit `ALLOW_MOCK_PROVIDERS=true`.
+- **Consequences**: Checkout now requires real payment before an order is fulfilled. Adding a direct
+  bank PSP later is a new adapter file plus one env change — no route, order or test changes.
+  Merchant credentials (`ZARINPAL_MERCHANT_ID`) are still a **business-side** input.
+
+---
+
+## ADR-009: SMS / OTP Provider — Kavehnegar (Pluggable Adapter)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `BL-007` / `TD-003` required mobile verification for registration. Candidates considered:
+  Kavehnegar and FarazSMS. Reviews consistently place Kavehnegar first for transactional OTP:
+  precise technical API documentation, REST + SOAP endpoints and SDKs, high-throughput OTP delivery,
+  and a voice-call fallback for landline numbers. FarazSMS is competitive mainly on price.
+- **Decision**: Adopt **Kavehnegar** as the default SMS provider behind a pluggable adapter
+  (`src/server/services/sms/`), selected by `SMS_PROVIDER`. OTP handling specifics:
+  - Codes are **never stored in plaintext** — only a salted SHA-256 digest (`crypto.randomInt` source).
+  - **Single use**: a verified code is destroyed immediately; replays fail with `NOT_FOUND`.
+  - TTL (default 120s), max 5 failed attempts, 60s resend cooldown and an hourly per-number ceiling
+    (anti SMS-pumping / toll-fraud abuse).
+  - The code is **never returned in an API response in production**; the mock provider echoes it only
+    outside production so local development works without credentials.
+  - A delivery failure destroys the pending code and returns 502, so no valid-but-undelivered code exists.
+- **Consequences**: Registration/login by mobile works end-to-end (`POST /api/auth/otp/request`,
+  `POST /api/auth/otp/verify`). Swapping panels later is one adapter file + one env change.
+  The API key and the pre-approved pattern name (`KAVENEGAR_OTP_TEMPLATE`) are business-side inputs.

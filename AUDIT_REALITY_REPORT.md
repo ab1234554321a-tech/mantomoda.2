@@ -85,8 +85,8 @@ This report presents a reality audit of the **Manto Moda** codebase. Every claim
 | **Skills System** | Executable tools | 6 standalone executable scripts in `skills/` running via `npm run agent:all` | **REAL** |
 | **GitHub Remote** | Source of Truth | Synced with `https://github.com/ab1234554321a-tech/mantomoda.2` (main) | **REAL** |
 | **GitHub Actions CI** | Automated remote testing | Remote `.github/workflows/ci.yml` pending GitHub PAT `workflow` scope | **PARTIAL** |
-| **Payment Gateway** | Live IPG Banking | Pluggable architecture ready; simulated instant checkout running | **PARTIAL** |
-| **SMS OTP Service** | Kavehnegar OTP | Direct phone/password registration active; SMS API pending credentials | **PARTIAL** |
+| **Payment Gateway** | Live IPG Banking | Pluggable adapter layer with Zarinpal implementation (ADR-008) — 24 assertions in `tests/payment.test.js`; awaiting merchant ID for live settlement | **REAL (code)** |
+| **SMS OTP Service** | Kavehnegar OTP | Pluggable adapter layer with Kavehnegar implementation (ADR-009) — 27 assertions in `tests/otp.test.js`; awaiting API key for live delivery | **REAL (code)** |
 | **Autonomous Daemon Loop** | Self-Evolving Background Loop | Callable on demand (`npm run agent:all`); no daemon cron running | **PARTIAL** |
 
 ---
@@ -205,7 +205,7 @@ To make the system truly **Self-Evolving**:
 1. **Phase 9.1**: Fix Documentation Drift (align `README.md` and `ARCHITECTURE.md` with Vanilla JS SPA reality).
 2. **Phase 9.2**: Enforce strict `JWT_SECRET` production startup guard in `src/server/index.js`.
 3. **Phase 9.3**: Connect persistent PostgreSQL database via Prisma ORM (`BL-005`).
-4. **Phase 9.4**: Implement Pluggable IPG Payment Gateway and SMS OTP adapters (`BL-006`, `BL-007`).
+4. ~~**Phase 9.4**: Implement Pluggable IPG Payment Gateway and SMS OTP adapters (`BL-006`, `BL-007`).~~ **DONE** — Zarinpal (ADR-008) and Kavehnegar (ADR-009) adapters implemented, tested and committed; only merchant credentials remain for live activation.
 5. **Phase 10.0**: Implement Continuous Autonomous Evolution Daemon.
 
 ---

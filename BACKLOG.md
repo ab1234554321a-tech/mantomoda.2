@@ -48,6 +48,31 @@ This backlog tracks all active, scheduled, and future engineering tasks for the 
 
 ## 2. Active Backlog (در دست اقدام و برنامه‌ریزی‌شده)
 
+### [RESOLVED — implementation complete, live credentials pending] BL-006: Iranian Payment Gateway (IPG) Adapter
+- **Severity**: P3 (Medium)
+- **Category**: Integration / Payments
+- **Evidence**: Checkout previously simulated instant payment (`paymentStatus: 'PAID'` hardcoded in the store).
+- **Solution**: Pluggable IPG adapter layer (ADR-008) with a **Zarinpal** implementation:
+  - `POST /api/payments/request` creates a session and returns the gateway URL.
+  - `GET /api/payments/callback` (browser) and `POST /api/payments/verify` (JSON) verify the transaction.
+  - `GET /api/payments/status/:orderId` for the client to poll.
+  - Orders are created `PENDING`; they become `PAID` only after server-side verification. Amounts are
+    converted Toman → Rial inside the adapter, always re-read from the stored order, and re-verified
+    against the gateway. Verification is idempotent and ownership-checked (BOLA-safe).
+- **Tests**: `tests/payment.test.js` (24 assertions).
+- **Status**: **RESOLVED (code)** — awaiting `ZARINPAL_MERCHANT_ID` from the business owner to go live.
+
+### [RESOLVED — implementation complete, live credentials pending] BL-007: SMS OTP Gateway Integration
+- **Severity**: P3 (Medium)
+- **Category**: Authentication / User Experience
+- **Evidence**: Registration used a direct password; no mobile verification existed.
+- **Solution**: Pluggable SMS adapter (ADR-009) with a **Kavehnegar** implementation plus a hardened OTP
+  service: salted-SHA-256 storage, single-use codes, 120s TTL, 5-attempt lockout, 60s resend cooldown,
+  hourly per-number ceiling. Endpoints `POST /api/auth/otp/request` and `POST /api/auth/otp/verify`;
+  first successful verification creates the account (passwordless registration).
+- **Tests**: `tests/otp.test.js` (27 assertions).
+- **Status**: **RESOLVED (code)** — awaiting `KAVENEGAR_API_KEY` + approved pattern from the business owner.
+
 ### BL-005: Persistent PostgreSQL Database Migration (Prisma ORM)
 - **Severity**: P2 (High)
 - **Category**: Data Layer & Scalability
@@ -57,18 +82,3 @@ This backlog tracks all active, scheduled, and future engineering tasks for the 
 - **Tests Required**: Database connection and CRUD integration tests.
 - **Status**: **PLANNED (Phase 9)**
 
-### BL-006: Iranian Payment Gateway (IPG) Pluggable Adapter
-- **Severity**: P3 (Medium)
-- **Category**: Integration / Payments
-- **Evidence**: Checkout currently simulates instant payment.
-- **Proposed Solution**: Implement real IPG adapter (Zarinpal / Saman Bank) with callback URL verification and transaction recording.
-- **Dependencies**: Business owner merchant terminal credentials.
-- **Status**: **PLANNED (Phase 9)**
-
-### BL-007: SMS OTP Gateway Integration (Kavehnegar / FarazSMS)
-- **Severity**: P3 (Medium)
-- **Category**: Authentication / User Experience
-- **Evidence**: Registration uses direct password without SMS verification.
-- **Proposed Solution**: Add OTP generation, temporary Redis/memory store, and SMS API dispatch.
-- **Dependencies**: SMS API key.
-- **Status**: **PLANNED (Phase 9)**

@@ -216,3 +216,77 @@ priceSanitizerMiddleware:
 - Primary breakpoints: Mobile (`< 640px`), Tablet (`640px - 1024px`), Desktop (`> 1024px`).
 - RTL layout support with standard Persian typography (e.g., Vazirmatn / Shabnam font stack).
 - Touch-friendly tap targets (minimum 44px) and fluid product image galleries.
+
+---
+
+## Payment & OTP Integration (ADR-008 / ADR-009)
+
+### Layering
+
+```
+src/server/
+├── services/
+│   ├── payment/
+│   │   ├── provider.js            # registry + startup guards (PAYMENT_PROVIDER)
+│   │   ├── zarinpal.provider.js   # live PSP adapter (REST v4, sandbox flag)
+│   │   └── mock.provider.js       # offline adapter for tests/dev
+│   ├── sms/
+│   │   ├── provider.js            # registry + startup guards (SMS_PROVIDER)
+│   │   ├── kavenegar.provider.js  # verify/lookup pattern sending
+│   │   └── mock.provider.js       # prints the code, keeps an outbox for tests
+│   └── otp.service.js             # hashing, TTL, attempts, rate limits
+└── routes/
+    ├── payment.routes.js          # /api/payments/*
+    └── auth.routes.js             # /api/auth/otp/*
+```
+
+### Payment data flow
+
+```
+POST /api/orders              -> order created, paymentStatus = PENDING
+POST /api/payments/request    -> amount read from the STORED order (never the request)
+                              -> provider.request()  => { authority, paymentUrl }
+                              -> payment session persisted (authority -> order)
+browser -> PSP                -> customer pays on the bank page
+GET  /api/payments/callback   -> provider.verify({ authority, amountRial })
+                              -> amount re-checked against the stored order
+                              -> payment.status = PAID, order.paymentStatus = PAID
+                              -> 302 redirect to the SPA result view
+POST /api/payments/verify     -> same logic, JSON response (tests / POST callbacks)
+GET  /api/payments/status/:orderId -> owner/admin only
+```
+
+Invariants: amounts are Toman in the storefront and converted to Rial **only** inside the Zarinpal
+adapter; verification is idempotent (PSP "already verified" is not a second charge); a repeated callback
+cannot flip the order twice; every endpoint is ownership-checked (BOLA/IDOR safe).
+
+### OTP data flow
+
+```
+POST /api/auth/otp/request  -> rate limits (cooldown + hourly ceiling)
+                            -> crypto.randomInt() 6-digit code
+                            -> record: { codeHash: salted SHA-256, salt, expiresAt, attempts }
+                            -> SMS adapter dispatch (failure => record destroyed, HTTP 502)
+POST /api/auth/otp/verify   -> timing-safe hash comparison
+                            -> success: record deleted (single use) + JWT issued
+                            -> failure: attempts incremented (lockout after N)
+```
+
+### Configuration
+
+| Variable | Purpose | Default |
+| :--- | :--- | :--- |
+| `PAYMENT_PROVIDER` | `zarinpal` \| `mock` | required in production |
+| `ZARINPAL_MERCHANT_ID` | PSP merchant UUID | required for zarinpal |
+| `ZARINPAL_SANDBOX` | route payments to the PSP sandbox | `false` |
+| `PAYMENT_CALLBACK_BASE_URL` | public HTTPS base the PSP redirects to | request host |
+| `SMS_PROVIDER` | `kavenegar` \| `mock` | required in production |
+| `KAVENEGAR_API_KEY` / `KAVENEGAR_SENDER` / `KAVENEGAR_OTP_TEMPLATE` | panel credentials + approved pattern | required for kavenegar |
+| `OTP_TTL_SECONDS` / `OTP_MAX_ATTEMPTS` / `OTP_RESEND_COOLDOWN_SECONDS` / `OTP_MAX_SENDS_PER_HOUR` | OTP policy | 120 / 5 / 60 / 5 |
+| `ALLOW_MOCK_PROVIDERS` | explicit opt-in to run mock providers in production (demo only) | `false` |
+
+### Data model additions
+
+`payments`: `id, orderId, userId, provider, authority, amountRial, amountToman, status (PENDING|PAID|FAILED), refId, cardPan, createdAt, verifiedAt, attempts`
+
+`otps` (ephemeral): `mobile, codeHash, salt, expiresAt, attempts, lastSentAt, sendCount, sendWindowStartedAt`

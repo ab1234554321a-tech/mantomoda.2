@@ -35,6 +35,16 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
   - [x] Multi-step Checkout modal with address capture and confirmation receipts.
   - [x] User Orders view with status badges.
   - [x] Full-featured Admin Dashboard with wholesale approval actions and order management.
+- [x] **Phase 9.4 (partial): Payment Gateway Adapter (BL-006 / ADR-008)**
+  - [x] Pluggable provider registry + Zarinpal adapter (sandbox-aware, Toman→Rial isolated).
+  - [x] Order lifecycle: `PENDING` → `PAID` only after server-side verification; idempotent callback; BOLA-safe.
+  - [x] Client checkout redirects to the gateway and renders a payment-result view.
+  - [ ] Provide `ZARINPAL_MERCHANT_ID` and switch `ZARINPAL_SANDBOX=false` for live payments.
+- [x] **Phase 9.4 (partial): SMS OTP Verification (BL-007 / ADR-009)**
+  - [x] Pluggable SMS registry + Kavehnegar adapter (pattern/lookup sending).
+  - [x] Hardened OTP service: hashed storage, single-use, TTL, attempt lockout, resend + hourly rate limits.
+  - [x] Passwordless mobile login/registration endpoints.
+  - [ ] Provide `KAVENEGAR_API_KEY` and the approved pattern name for live OTP delivery.
 - [x] **AI Toolchain: Curated Claude Skills (ADR-006)**
   - [x] Audited the full 188-skill upstream collection and selected the 69 relevant to this roadmap.
   - [x] Vendored skills at `.claude/skills/` + cross-platform installers (`scripts/install-claude-skills.sh`, `install-skills.bat`).
@@ -63,8 +73,8 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ### Phase 9 & 10: Production Deployment & Continuous Integration
 - [ ] Connect production PostgreSQL/MySQL database via Prisma ORM.
-- [ ] Connect Iranian IPG Payment Gateway (Zarinpal / Saman Bank) upon merchant terminal delivery.
-- [ ] Connect SMS OTP service (Kavehnegar) for SMS authentication.
+- [x] Connect Iranian IPG Payment Gateway — **Zarinpal adapter implemented** (ADR-008); live merchant ID pending.
+- [x] Connect SMS OTP service — **Kavehnegar adapter implemented** (ADR-009); live API key pending.
 - [ ] Configure SSL certificate, domain DNS, and automated daily backups.
 
 ---
@@ -77,5 +87,8 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 5. Technical Debt (بدهی فنی)
 
-- [ ] Replace simulated session tokens with cryptographically signed RS256 JWT tokens with refresh rotation.
+- [x] ~~Replace simulated session tokens~~ — already resolved: HMAC-SHA256 JWT is in place (`utils/auth-crypto.js`).
+- [x] ~~SMS OTP mobile verification (TD-003)~~ — implemented via the Kavehnegar adapter (ADR-009).
+- [x] ~~Pluggable payment provider adapter (TD-002)~~ — implemented with Zarinpal (ADR-008).
+- [ ] Add JWT refresh-token rotation (RS256 + rotating refresh tokens).
 - [ ] Add Redis caching layer for catalog query optimization on heavy traffic.

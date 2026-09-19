@@ -81,6 +81,7 @@ function navigate(viewName) {
   document.getElementById('view-wholesale').classList.toggle('hidden', viewName !== 'wholesale');
   document.getElementById('view-orders').classList.toggle('hidden', viewName !== 'orders');
   document.getElementById('view-admin').classList.toggle('hidden', viewName !== 'admin');
+  document.getElementById('view-payment-result')?.classList.toggle('hidden', viewName !== 'payment-result');
 
   // Nav Buttons active highlight
   ['catalog', 'wholesale', 'orders', 'admin'].forEach(tab => {
@@ -671,13 +672,92 @@ async function submitOrder(e) {
     saveCart();
     state.cartCalculation = null;
 
+    const order = res.data;
+
+    // Online orders must actually be paid: ask the backend for a gateway link.
+    if (order.paymentMethod === 'ONLINE_GATEWAY' && order.paymentStatus !== 'PAID') {
+      const payRes = await apiFetch('/api/payments/request', {
+        method: 'POST',
+        body: JSON.stringify({ orderId: order.id })
+      });
+
+      if (payRes.success && payRes.data?.paymentUrl) {
+        showToast('در حال انتقال به درگاه پرداخت…', 'info');
+        window.location.href = payRes.data.paymentUrl;
+        return;
+      }
+
+      showToast(payRes.message || 'ایجاد لینک پرداخت ناموفق بود.', 'error');
+      // Fall through to the receipt so the order is never lost from the UI.
+    }
+
     document.getElementById('checkout-form-container').classList.add('hidden');
     document.getElementById('checkout-success').classList.remove('hidden');
-    document.getElementById('confirmed-order-number').textContent = res.data.orderNumber;
+    document.getElementById('confirmed-order-number').textContent = order.orderNumber;
+
+    const paymentNote = document.getElementById('confirmed-payment-note');
+    if (paymentNote) {
+      if (order.paymentStatus === 'PAID') {
+        paymentNote.textContent = 'پرداخت این سفارش تأیید شده است.';
+      } else if (order.paymentMethod === 'BANK_TRANSFER_RECEIPT') {
+        paymentNote.textContent = 'این سفارش در انتظار بررسی فیش بانکی توسط پشتیبانی است.';
+      } else {
+        paymentNote.textContent = 'این سفارش در انتظار پرداخت است.';
+      }
+    }
+
     showToast('سفارش شما با موفقیت ثبت شد.', 'success');
   } else {
     showToast(res.message || 'خطا در ثبت سفارش', 'error');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Payment result screen: the PSP redirects back to /?payment=success|failed
+// ---------------------------------------------------------------------------
+function handlePaymentReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const result = params.get('payment');
+  if (!result) return false;
+
+  const orderNumber = params.get('order') || '';
+  const refId = params.get('ref') || '';
+
+  const success = result === 'success';
+  const html = `
+    <div class="max-w-lg mx-auto bg-white p-8 rounded-3xl border ${success ? 'border-emerald-200' : 'border-rose-200'} shadow-sm text-center space-y-4">
+      <div class="text-5xl">${success ? '✅' : '⚠️'}</div>
+      <h2 class="text-xl font-black ${success ? 'text-emerald-700' : 'text-rose-700'}">
+        ${success ? 'پرداخت با موفقیت انجام شد' : 'پرداخت انجام نشد'}
+      </h2>
+      ${orderNumber ? `<p class="text-sm text-slate-600">شماره سفارش: <span class="font-mono font-bold">${orderNumber}</span></p>` : ''}
+      ${refId ? `<p class="text-xs text-slate-500">کد پیگیری پرداخت: <span class="font-mono">${refId}</span></p>` : ''}
+      <p class="text-xs text-slate-500">
+        ${success ? 'سفارش شما ثبت شد و در حال آماده‌سازی است.' : 'مبلغی از حساب شما کسر نشده است. می‌توانید مجدداً تلاش کنید.'}
+      </p>
+      <div class="flex gap-2 justify-center pt-2">
+        <button onclick="navigate('orders')" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">سفارش‌های من</button>
+        <button onclick="navigate('catalog')" class="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">ادامه خرید</button>
+      </div>
+    </div>
+  `;
+
+  // Render into the dedicated result view (all other views stay untouched).
+  document.querySelectorAll('#view-catalog, #view-wholesale, #view-orders, #view-admin')
+    .forEach(el => el.classList.add('hidden'));
+  document.getElementById('hero-banner')?.classList.add('hidden');
+
+  const view = document.getElementById('view-payment-result');
+  const container = document.getElementById('payment-result-container');
+  if (view && container) {
+    container.innerHTML = html;
+    view.classList.remove('hidden');
+  } else {
+    document.body.insertAdjacentHTML('afterbegin', html);
+  }
+
+  window.history.replaceState({}, '', window.location.pathname);
+  return true;
 }
 
 // User Orders View
@@ -1024,6 +1104,12 @@ document.getElementById('header-search-input')?.addEventListener('input', (e) =>
 
 // App Initialization
 async function initApp() {
+  // Returning from the payment gateway? Show the result and stop here.
+  if (handlePaymentReturn()) {
+    updateCartBadge();
+    return;
+  }
+
   await setupRoleSwitcher();
   // Initialize with regular customer session
   const initialRoleRes = await apiFetch('/api/auth/switch-role', {

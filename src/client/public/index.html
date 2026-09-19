@@ -367,6 +367,11 @@
     </div>
 
     <!-- VIEW 3: USER ORDERS -->
+    <!-- PAYMENT GATEWAY RESULT VIEW -->
+    <div id="view-payment-result" class="hidden space-y-6">
+      <div id="payment-result-container"></div>
+    </div>
+
     <div id="view-orders" class="hidden space-y-6">
       <div class="flex items-center justify-between">
         <div>
@@ -598,7 +603,7 @@
         <h3 class="text-xl font-black text-slate-900">سفارش شما با موفقیت ثبت گردید!</h3>
         <p class="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
           شناسه سفارش: <span id="confirmed-order-number" class="font-mono font-bold text-slate-900"></span><br>
-          رسید خرید برای شماره همراه شما ارسال شد و سفارش در مرحله آماده‌سازی قرار گرفت.
+          <span id="confirmed-payment-note">رسید خرید برای شماره همراه شما ارسال شد.</span>
         </p>
         <button onclick="closeCheckoutModal(); navigate('orders')" class="px-6 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">مشاهده سفارش در پنل</button>
       </div>

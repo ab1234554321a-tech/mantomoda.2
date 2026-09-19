@@ -18,6 +18,7 @@
 
 - **Single Source of Truth**: The Git repository houses all code, documentation, architecture records, and real-time project state (`PROJECT_STATE.md` / `project-state.json`). AI agents do not rely on fragile chat memory.
 - **Real Backend Security**: **UI Security ≠ Real Security**. Wholesale pricing and margin data are stripped at the API/middleware layer for non-wholesale users, preventing inspection or price leakage.
+- **Real Payments, Real Verification**: The UI never decides that an order is paid. Orders start `PENDING`, the amount is re-read from the database (never from the request), and only a server-side verification call to the PSP flips them to `PAID` — idempotently, so a replayed callback cannot double-charge.
 - **Autonomous Multi-Agent Collaboration**: Strict collaboration rules in `AGENTS.md`, `CLAUDE.md`, and `CODEX.md` ensure that Claude Code, Codex, and other tools work seamlessly together.
 
 ---
@@ -53,6 +54,8 @@
 
 - **Frontend**: React 18, TypeScript, TailwindCSS, Lucide Icons, Vite
 - **Backend**: Node.js, Express, TypeScript, Zod, JWT, bcrypt
+- **Payments**: Zarinpal IPG behind a pluggable adapter (ADR-008) — sandbox-aware
+- **SMS / OTP**: Kavehnegar behind a pluggable adapter (ADR-009) — hashed, single-use, rate-limited codes
 - **Testing**: Vitest, Supertest
 - **State Management**: React Context / Hooks
 - **Architecture**: Modular Controller-Service-Repository Pattern with RBAC Guards

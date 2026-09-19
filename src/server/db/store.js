@@ -8,6 +8,8 @@ class DataStore {
     this.categories = JSON.parse(JSON.stringify(SEED_CATEGORIES));
     this.products = JSON.parse(JSON.stringify(SEED_PRODUCTS));
     this.orders = JSON.parse(JSON.stringify(SEED_ORDERS));
+    this.payments = []; // Payment sessions (PSP authority -> order) — BL-006
+    this.otps = [];     // Ephemeral OTP records, hashed — BL-007
   }
 
   // --- User Operations ---
@@ -45,6 +47,100 @@ class DataStore {
     if (!user) return null;
     Object.assign(user, updates);
     return user;
+  }
+
+  // --- OTP Operations (BL-007, hashed & single-use) ---
+  findOtpByMobile(mobile) {
+    if (!mobile) return null;
+    return this.otps.find(o => o.mobile === mobile) || null;
+  }
+
+  saveOtpRecord(mobile, record) {
+    const index = this.otps.findIndex(o => o.mobile === mobile);
+    if (index >= 0) this.otps.splice(index, 1);
+    const stored = { mobile, createdAt: new Date().toISOString(), ...record };
+    this.otps.push(stored);
+    return stored;
+  }
+
+  incrementOtpAttempts(mobile) {
+    const record = this.findOtpByMobile(mobile);
+    if (!record) return null;
+    record.attempts += 1;
+    return record;
+  }
+
+  deleteOtpByMobile(mobile) {
+    const index = this.otps.findIndex(o => o.mobile === mobile);
+    if (index < 0) return false;
+    this.otps.splice(index, 1);
+    return true;
+  }
+
+  purgeExpiredOtps() {
+    const now = Date.now();
+    const before = this.otps.length;
+    this.otps = this.otps.filter(o => new Date(o.expiresAt).getTime() > now);
+    return before - this.otps.length;
+  }
+
+  // --- Payment Operations (BL-006) ---
+  createPayment(paymentData) {
+    const payment = {
+      id: `pay-${Date.now().toString().slice(-6)}`,
+      orderId: paymentData.orderId,
+      userId: paymentData.userId,
+      provider: paymentData.provider,
+      authority: paymentData.authority,
+      amountRial: paymentData.amountRial,
+      amountToman: paymentData.amountToman,
+      status: 'PENDING', // PENDING -> PAID | FAILED
+      refId: null,
+      cardPan: null,
+      createdAt: new Date().toISOString(),
+      verifiedAt: null,
+      attempts: 0
+    };
+    this.payments.push(payment);
+    return payment;
+  }
+
+  findPaymentByAuthority(authority) {
+    return this.payments.find(p => p.authority === authority) || null;
+  }
+
+  findPaymentByOrderId(orderId) {
+    return [...this.payments].reverse().find(p => p.orderId === orderId) || null;
+  }
+
+  listPayments() {
+    return [...this.payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  markPaymentVerified(authority, { refId, cardPan, status }) {
+    const payment = this.findPaymentByAuthority(authority);
+    if (!payment) return null;
+    payment.status = status;
+    payment.refId = refId ?? payment.refId;
+    payment.cardPan = cardPan ?? payment.cardPan;
+    payment.verifiedAt = new Date().toISOString();
+    payment.attempts += 1;
+    return payment;
+  }
+
+  markPaymentAttemptFailed(authority) {
+    const payment = this.findPaymentByAuthority(authority);
+    if (!payment) return null;
+    payment.attempts += 1;
+    return payment;
+  }
+
+  updatePaymentStatus(orderId, status, refId = null) {
+    const payment = this.findPaymentByOrderId(orderId);
+    if (!payment) return null;
+    payment.status = status;
+    if (refId) payment.refId = refId;
+    return payment;
   }
 
   // --- Wholesale Application Operations ---
@@ -197,13 +293,25 @@ class DataStore {
       totalAmount: orderData.totalAmount,
       discountAmount: orderData.discountAmount || 0,
       payableAmount: orderData.payableAmount,
-      paymentStatus: 'PAID', // Simulated instant checkout
+      // Online checkout starts UNPAID: the order is only marked PAID after the
+      // PSP verifies the transaction (ADR-008). Bank-transfer receipts stay
+      // PENDING until an admin confirms the receipt.
+      paymentStatus: orderData.paymentStatus || 'PENDING',
       paymentMethod: orderData.paymentMethod || 'ONLINE_GATEWAY',
       shippingAddress: orderData.shippingAddress,
       createdAt: new Date().toISOString()
     };
     this.orders.unshift(newOrder);
     return newOrder;
+  }
+
+  markOrderPaid(orderId, { paymentStatus = 'PAID', refId = null, paidAt = null } = {}) {
+    const order = this.findOrderById(orderId);
+    if (!order) return null;
+    order.paymentStatus = paymentStatus;
+    if (refId) order.paymentRefId = refId;
+    order.paidAt = paidAt || new Date().toISOString();
+    return order;
   }
 
   updateOrderStatus(orderId, status) {

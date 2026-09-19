@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { hashPassword, comparePassword, signToken } from '../utils/auth-crypto.js';
-import { validate, loginSchema, registerSchema } from '../middlewares/validate.js';
+import { validate, loginSchema, registerSchema, otpRequestSchema, otpVerifySchema } from '../middlewares/validate.js';
+import { requestOtp, verifyOtp, OTP_CONFIG } from '../services/otp.service.js';
 
 const router = Router();
 
@@ -102,6 +103,89 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     },
     message: 'ثبت‌نام شما با موفقیت انجام شد.'
   });
+});
+
+
+// ---------------------------------------------------------------------------
+// OTP: request a verification code (BL-007 / TD-003)
+// ---------------------------------------------------------------------------
+router.post('/otp/request', validate(otpRequestSchema), async (req, res, next) => {
+  try {
+    const { mobile, fullName } = req.body;
+    const result = await requestOtp({ mobile, fullName });
+
+    res.json({
+      success: true,
+      data: {
+        mobile,
+        expiresInSeconds: result.expiresInSeconds,
+        resendCooldownSeconds: result.resendCooldownSeconds,
+        // Only present outside production with the mock SMS provider.
+        ...(result.devCode ? { devCode: result.devCode } : {})
+      },
+      message: 'کد تأیید ارسال شد.'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// OTP: verify the code. Logs the user in, or registers them on first success.
+// ---------------------------------------------------------------------------
+router.post('/otp/verify', validate(otpVerifySchema), (req, res) => {
+  const { mobile, code } = req.body;
+  const result = verifyOtp({ mobile, code });
+
+  if (!result.ok) {
+    return res.status(401).json({
+      success: false,
+      error: result.reason,
+      message: result.message,
+      ...(result.remainingAttempts !== undefined ? { remainingAttempts: result.remainingAttempts } : {})
+    });
+  }
+
+  // First successful verification creates the account (mobile acts as identity).
+  let user = db.findUserByPhone(mobile);
+  let isNewUser = false;
+
+  if (!user) {
+    user = db.createUser({
+      fullName: result.fullName || `کاربر ${mobile.slice(-4)}`,
+      phone: mobile,
+      email: `${mobile}@manto-moda.ir`,
+      passwordHash: null, // passwordless account; login happens through OTP
+      role: 'REGULAR',
+      isWholesaleVerified: false
+    });
+    isNewUser = true;
+  }
+
+  const token = signToken(user);
+
+  res.json({
+    success: true,
+    data: {
+      token,
+      isNewUser,
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        fullName: user.fullName,
+        role: user.role,
+        isWholesaleVerified: user.isWholesaleVerified,
+        companyName: user.companyName || ''
+      }
+    },
+    message: isNewUser ? 'حساب شما با موفقیت ساخته شد.' : 'ورود با موفقیت انجام شد.'
+  });
+});
+
+// OTP policy (public: the client shows the countdown/TTL to the user)
+router.get('/otp/policy', (req, res) => {
+  res.json({ success: true, data: OTP_CONFIG });
 });
 
 // Current User Profile

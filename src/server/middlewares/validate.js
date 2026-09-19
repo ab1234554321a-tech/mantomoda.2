@@ -40,6 +40,21 @@ export const orderCheckoutSchema = z.object({
   paymentMethod: z.enum(['ONLINE_GATEWAY', 'BANK_TRANSFER_RECEIPT']).default('ONLINE_GATEWAY')
 });
 
+
+export const otpRequestSchema = z.object({
+  mobile: z.string().regex(/^09\d{9}$/, 'شماره موبایل باید با ۰۹ شروع شده و ۱۱ رقم باشد'),
+  fullName: z.string().min(3, 'نام و نام خانوادگی الزامی است').max(100).optional()
+});
+
+export const otpVerifySchema = z.object({
+  mobile: z.string().regex(/^09\d{9}$/, 'شماره موبایل باید با ۰۹ شروع شده و ۱۱ رقم باشد'),
+  code: z.string().regex(/^\d{6}$/, 'کد تأیید باید ۶ رقم باشد')
+});
+
+export const paymentRequestSchema = z.object({
+  orderId: z.string().min(3, 'شناسه سفارش الزامی است').max(80)
+});
+
 /**
  * Validation Middleware Factory
  */

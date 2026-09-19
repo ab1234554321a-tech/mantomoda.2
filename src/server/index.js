@@ -15,6 +15,7 @@ import wholesaleRoutes from './routes/wholesale.routes.js';
 import cartRoutes from './routes/cart.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,6 +122,7 @@ app.use('/api/products', generalApiLimiter, productRoutes);
 app.use('/api/wholesale', generalApiLimiter, wholesaleRoutes);
 app.use('/api/cart', generalApiLimiter, cartRoutes);
 app.use('/api/orders', generalApiLimiter, orderRoutes);
+app.use('/api/payments', generalApiLimiter, paymentRoutes);
 app.use('/api/admin', generalApiLimiter, adminRoutes);
 
 // 9. Serve Client Static Files

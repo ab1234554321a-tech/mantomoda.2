@@ -27,6 +27,9 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 - **Testing**: Automated CI test suites (`npm test`) covering price security, approval state machine, and cart calculations.
 - **AI Skill Toolchain**: 69 curated Claude Skills vendored at `.claude/skills/` (ADR-006). **Read `SKILLS.md`** to load the skills mapped to the phase/role you are about to work on. Installers: `scripts/install-claude-skills.sh` (macOS/Linux), `install-skills.bat` (Windows).
 - **Frame/Embedding Policy**: `CSP_FRAME_ANCESTORS` env var (ADR-007). Default production behaviour unchanged (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`).
+- **Payments (BL-006 / ADR-008)**: `src/server/services/payment/` — pluggable registry (`zarinpal` | `mock`). Orders are `PENDING` until verified. Amounts: storefront = Toman, PSP = Rial (converted only inside the adapter). Verification is idempotent and amount-checked against the stored order.
+- **OTP / SMS (BL-007 / ADR-009)**: `src/server/services/sms/` + `src/server/services/otp.service.js` — pluggable registry (`kavenegar` | `mock`). Codes are salted-hashed, single-use, TTL-limited and rate-limited.
+- **Provider guards**: production refuses to start with an unconfigured provider; `mock` needs `ALLOW_MOCK_PROVIDERS=true`.
 
 ---
 
@@ -96,11 +99,22 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 
 ---
 
+## 11.c Integration State (2026-09-20)
+- Payment gateway (Zarinpal) and SMS OTP (Kavehnegar) adapters are **implemented, tested and committed**; both were chosen for reliability over the alternatives.
+- Live activation requires only merchant credentials in `.env` — no code change:
+  `PAYMENT_PROVIDER=zarinpal`, `ZARINPAL_MERCHANT_ID=<uuid>`, `ZARINPAL_SANDBOX=false`, `PAYMENT_CALLBACK_BASE_URL=https://<domain>`
+  `SMS_PROVIDER=kavehnegar`, `KAVENEGAR_API_KEY=<key>`, `KAVENEGAR_SENDER=<line>`, `KAVENEGAR_OTP_TEMPLATE=<pattern>`
+- Automated gate: `npm test` → 6 suites, all green.
+- **Known limitation**: with the in-memory store, payment sessions and OTP records are lost on restart (fine for single-instance; resolved by BL-005 / Redis).
+
+---
+
 ## 12. Recommended Next Step
 - Review production deployment checklist and present project state and live deliverable.
 
 ---
 
 ## 13. Human Decisions Required
-- Select Iranian Payment Gateway provider (Zarinpal / Pay.ir / Bank IPG).
-- Select SMS OTP provider (Kavehnegar / FarazSMS).
+- ~~Select Iranian Payment Gateway provider~~ → **DECIDED: Zarinpal** (ADR-008).
+- ~~Select SMS OTP provider~~ → **DECIDED: Kavehnegar** (ADR-009).
+- Remaining merchant-side inputs (credentials, not decisions): `ZARINPAL_MERCHANT_ID`, `KAVENEGAR_API_KEY` + approved OTP pattern.

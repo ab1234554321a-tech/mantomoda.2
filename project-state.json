@@ -1,9 +1,9 @@
 {
   "projectName": "Manto Moda",
   "version": "0.3.0-rc1",
-  "lastUpdated": "2026-09-20T00:00:00.000Z",
+  "lastUpdated": "2026-09-20T12:00:00.000Z",
   "activeBranch": "main",
-  "currentPhase": "Phase 7 & 8 Completed — Advancing to Phase 9 (Production DB & Deployment Delivery)",
+  "currentPhase": "Phase 9 — Payment Gateway & SMS OTP integrated (adapters complete, live credentials pending); PostgreSQL/Prisma next",
   "overallProgressPercent": 88,
   "healthScore": 94.4,
   "completed": [
@@ -27,12 +27,14 @@
     "4-Tier Automated CI Testing Gate: Unit, Integration, Security, and Red Team Adversarial tests",
     "PROJECT_AUDIT.md, BACKLOG.md, and TECH_DEBT.md engineering registries",
     "Curated Claude Skills toolchain adopted (188 audited → 69 selected, vendored at .claude/skills with SKILLS.md mapping and cross-platform installers)",
-    "Environment-scoped frame embedding policy via CSP_FRAME_ANCESTORS (ADR-007); production defaults unchanged and regression-verified"
+    "Environment-scoped frame embedding policy via CSP_FRAME_ANCESTORS (ADR-007); production defaults unchanged and regression-verified",
+    "Payment gateway integration (BL-006 / ADR-008): pluggable adapter layer with Zarinpal, PENDING→PAID order lifecycle, idempotent server-side verification, BOLA-safe endpoints",
+    "SMS OTP verification (BL-007 / TD-003 / ADR-009): pluggable adapter layer with Kavehnegar, hashed single-use codes, TTL, attempt lockout and per-number rate limits",
+    "Production startup guards: app refuses to start with an unset/unconfigured payment or SMS provider; mock providers require explicit ALLOW_MOCK_PROVIDERS=true",
+    "Automated test gate extended to 6 suites (Level 5 payment, Level 6 OTP)"
   ],
   "inProgress": [
-    "Persistent PostgreSQL database migration (BL-005)",
-    "Iranian IPG Payment Gateway adapter (BL-006)",
-    "SMS OTP mobile verification (BL-007)"
+    "Persistent PostgreSQL database migration (BL-005)"
   ],
   "blocked": [],
   "knownBugs": [],
@@ -43,15 +45,15 @@
       "mitigation": "Store pattern abstracts data layer for straightforward Prisma / PostgreSQL drop-in"
     },
     {
-      "risk": "Payment Gateway credentials required for real transactions",
+      "risk": "Live payment/SMS credentials not yet supplied",
       "severity": "LOW",
-      "mitigation": "Simulated instant payment gateway in place; pluggable provider adapter ready"
+      "mitigation": "Adapters are complete and unit-tested against the provider contracts; mock providers allow full end-to-end flow testing offline (explicitly refused in production)"
     }
   ],
-  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM (BL-005) using the adopted backend skills (postgresql-optimization, database-design-patterns, refactoring-surgeon), then proceed to the IPG and SMS OTP adapters.",
+  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM (BL-005); live payment and OTP activation only needs merchant credentials in .env.",
   "humanDecisionsRequired": [
-    "Select Iranian Payment Gateway provider (Zarinpal / Pay.ir / Bank IPG)",
-    "Select Iranian SMS OTP Gateway provider (Kavehnegar / FarazSMS)"
+    "Provide ZARINPAL_MERCHANT_ID (business registration with the PSP is a merchant-side process)",
+    "Provide KAVENEGAR_API_KEY and the approved OTP pattern name (KAVENEGAR_OTP_TEMPLATE)"
   ],
   "aiToolchain": {
     "skillsSource": "github.com/erichowens/some_claude_skills (MIT)",
