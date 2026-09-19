@@ -35,6 +35,13 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
   - [x] Multi-step Checkout modal with address capture and confirmation receipts.
   - [x] User Orders view with status badges.
   - [x] Full-featured Admin Dashboard with wholesale approval actions and order management.
+- [x] **AI Toolchain: Curated Claude Skills (ADR-006)**
+  - [x] Audited the full 188-skill upstream collection and selected the 69 relevant to this roadmap.
+  - [x] Vendored skills at `.claude/skills/` + cross-platform installers (`scripts/install-claude-skills.sh`, `install-skills.bat`).
+  - [x] Documented the mapping in `SKILLS.md` (phases, 13 agent roles, UX, SEO).
+- [x] **Environment-Scoped Frame Policy (ADR-007)**
+  - [x] `CSP_FRAME_ANCESTORS` env var; production default unchanged; documented in `.env.example` + `DECISIONS.md`.
+  - [x] Regression verified — all 4 suites green.
 - [x] **Phase 8: Automated Testing Gate**
   - [x] Security test suite verifying price sanitization and role guards (`tests/security.test.js`).
   - [x] Wholesale approval state machine tests (`tests/wholesale.test.js`).

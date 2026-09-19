@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Curated Claude Skills Toolchain (ADR-006)**: Reviewed all 188 skills of the MIT-licensed `erichowens/some_claude_skills` collection and adopted the **69** that map to roadmap phases, Agent Roles (`agents/01..13`), and open backlog items. Vendored at `.claude/skills/` so every clone has them; installable to the user profile via `scripts/install-claude-skills.sh` (macOS/Linux) or `install-skills.bat` (Windows, double-click).
+- **`SKILLS.md`**: Skill-to-roadmap-phase and skill-to-agent-role mapping (Phase 9.1→10, all 13 agent roles, UI/UX, SEO, AI).
+- **`scripts/install-claude-skills.sh`**: Group-based installer/uninstaller with `--group`, `--into-repo`, `--list`, `--force`, `--uninstall` flags. Validates every installed skill has a `SKILL.md`.
+- **`CSP_FRAME_ANCESTORS` configuration**: Optional environment variable (documented in `.env.example`) to allow embedding the app in trusted staging/preview surfaces.
+
+### Changed
+- **Security Headers (ADR-007)**: CSP `frame-ancestors` is now environment-scoped instead of hardcoded. Default behaviour is unchanged (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`); `frameguard` is disabled only when `CSP_FRAME_ANCESTORS` is explicitly set, since `X-Frame-Options` would otherwise override the widened CSP.
+
+### Security
+- Security-audited all 188 candidate skills before adoption (command-injection patterns, `curl | bash` installers, hardcoded secrets, prompt-injection phrasing). One skill — `automatic-stateful-prompt-improver` — was **rejected** for shipping a `curl | bash` setup step.
+- Verified no regression: all 4 test suites (pricing, wholesale, security, red-team) pass after the header change.
+
+---
+
 ## [0.3.0-rc1] - 2026-09-04
 
 ### Added

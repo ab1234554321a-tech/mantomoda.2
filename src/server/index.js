@@ -31,10 +31,20 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
-      connectSrc: ["'self'"]
+      connectSrc: ["'self'"],
+      // Configurable so the app can be embedded in staging/preview iframes.
+      // Default remains restrictive ('self'); production must NOT widen this.
+      // Example: CSP_FRAME_ANCESTORS="https://panel.example.com,https://admin.example.com"
+      frameAncestors: process.env.CSP_FRAME_ANCESTORS
+        ? process.env.CSP_FRAME_ANCESTORS.split(',').map((s) => s.trim()).filter(Boolean)
+        : ["'self'"]
     }
   },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  // X-Frame-Options duplicates the CSP frame-ancestors policy and would block
+  // trusted embedding even after CSP is widened, so it is disabled only when
+  // CSP_FRAME_ANCESTORS is explicitly configured. Default stays SAMEORIGIN.
+  frameguard: process.env.CSP_FRAME_ANCESTORS ? false : { action: 'sameorigin' }
 }));
 
 // 2. CORS Configuration

@@ -13,6 +13,15 @@ Welcome, Claude Code! As an engineering agent on the **Manto Moda** project, you
 
 ---
 
+## 1.b Adopted Skill Toolchain (ADR-006)
+- **69 curated Claude Skills** are vendored at `.claude/skills/` and are available to you on any clone — no setup needed.
+- **Before starting a roadmap phase or an Agent Role task, open `SKILLS.md`** and load the skills mapped to that phase/role (e.g. Phase 9.3 → `postgresql-optimization`, `database-design-patterns`, `refactoring-surgeon`).
+- Skills are **instruction files only**: they never edit `PROJECT_STATE.md` / `TASKS.md` on their own. Update state yourself per the session workflow below.
+- Trim or extend the set with `bash scripts/install-claude-skills.sh --group <name> --into-repo` (groups: `meta backend devops qa frontend ux seo docs ai`).
+- Any newly adopted skill requires an ADR entry (see ADR-006) and a security audit first.
+
+---
+
 ## 2. Pre-Flight Checklist Before Starting Any Work
 1. Read `AGENTS.md` to refresh global agent rules.
 2. Read `PROJECT_STATE.md` and `TASKS.md` to know current phase and priority backlog.

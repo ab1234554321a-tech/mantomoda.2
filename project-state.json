@@ -1,7 +1,7 @@
 {
   "projectName": "Manto Moda",
   "version": "0.3.0-rc1",
-  "lastUpdated": "2026-09-04T22:19:28.950Z",
+  "lastUpdated": "2026-09-20T00:00:00.000Z",
   "activeBranch": "main",
   "currentPhase": "Phase 7 & 8 Completed — Advancing to Phase 9 (Production DB & Deployment Delivery)",
   "overallProgressPercent": 88,
@@ -25,7 +25,9 @@
     "SRE Request-ID tracing, duration logging, memory metrics, and graceful shutdown",
     "Official Stdio JSON-RPC 2.0 MCP Server via @modelcontextprotocol/sdk (src/mcp/server.js)",
     "4-Tier Automated CI Testing Gate: Unit, Integration, Security, and Red Team Adversarial tests",
-    "PROJECT_AUDIT.md, BACKLOG.md, and TECH_DEBT.md engineering registries"
+    "PROJECT_AUDIT.md, BACKLOG.md, and TECH_DEBT.md engineering registries",
+    "Curated Claude Skills toolchain adopted (188 audited → 69 selected, vendored at .claude/skills with SKILLS.md mapping and cross-platform installers)",
+    "Environment-scoped frame embedding policy via CSP_FRAME_ANCESTORS (ADR-007); production defaults unchanged and regression-verified"
   ],
   "inProgress": [
     "Persistent PostgreSQL database migration (BL-005)",
@@ -46,9 +48,37 @@
       "mitigation": "Simulated instant payment gateway in place; pluggable provider adapter ready"
     }
   ],
-  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM and prepare live production staging.",
+  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM (BL-005) using the adopted backend skills (postgresql-optimization, database-design-patterns, refactoring-surgeon), then proceed to the IPG and SMS OTP adapters.",
   "humanDecisionsRequired": [
     "Select Iranian Payment Gateway provider (Zarinpal / Pay.ir / Bank IPG)",
     "Select Iranian SMS OTP Gateway provider (Kavehnegar / FarazSMS)"
-  ]
+  ],
+  "aiToolchain": {
+    "skillsSource": "github.com/erichowens/some_claude_skills (MIT)",
+    "skillsAudited": 188,
+    "skillsActive": 69,
+    "skillsVendoredAt": ".claude/skills",
+    "mapping": "SKILLS.md",
+    "install": [
+      "scripts/install-claude-skills.sh",
+      "install-skills.bat"
+    ],
+    "groups": [
+      "meta",
+      "backend",
+      "devops",
+      "qa",
+      "frontend",
+      "ux",
+      "seo",
+      "docs",
+      "ai"
+    ],
+    "rejected": [
+      {
+        "skill": "automatic-stateful-prompt-improver",
+        "reason": "ships a curl | bash installer (supply-chain risk)"
+      }
+    ]
+  }
 }

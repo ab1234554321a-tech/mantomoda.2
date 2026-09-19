@@ -10,9 +10,10 @@
 - **Current Phase**: Phase 7, 8 & CTO Orchestration Complete — Advancing to Phase 9 (Persistent PostgreSQL & Production Delivery)
 - **Overall Progress**: 88%
 - **Health Score**: **94.4 / 100** (Evidence-based assessment in `PROJECT_AUDIT.md`)
-- **Last Updated**: 2026-09-04
+- **Last Updated**: 2026-09-20
 - **Active Git Branch**: `main`
-- **Last Major Change**: Completed Master Orchestrator CTO Cycle: Formalized all 12 Agent role specs (`agents/`), built protocol-compliant Stdio JSON-RPC 2.0 MCP server (`src/mcp/server.js`), implemented Zod request validation schemas, integrated Helmet security headers, anti-brute force rate limiting, SRE request duration logs, graceful shutdown handlers, and 4-tier automated test gate including Red Team adversarial tests.
+- **Last Major Change (2026-09-20)**: Adopted the curated Claude Skills toolchain — audited all 188 upstream skills, installed the 69 that map to roadmap phases / Agent Roles / backlog items (`.claude/skills/` + `SKILLS.md` + cross-platform installers), and made the frame-embedding policy environment-scoped (`CSP_FRAME_ANCESTORS`, ADR-006 & ADR-007). All 4 test suites re-verified green.
+- **Previous Major Change**: Completed Master Orchestrator CTO Cycle: Formalized all 12 Agent role specs (`agents/`), built protocol-compliant Stdio JSON-RPC 2.0 MCP server (`src/mcp/server.js`), implemented Zod request validation schemas, integrated Helmet security headers, anti-brute force rate limiting, SRE request duration logs, graceful shutdown handlers, and 4-tier automated test gate including Red Team adversarial tests.
 
 ---
 
@@ -41,6 +42,11 @@
   - [x] Level 2: Wholesale Application & Admin Approval (`tests/wholesale.test.js`).
   - [x] Level 3: Price Isolation & JWT Cryptography (`tests/security.test.js`).
   - [x] Level 4: Red Team Adversarial, Type Confusion & BOLA (`tests/adversarial.test.js`).
+- [x] **AI Toolchain & Environment Policy (ADR-006, ADR-007)**:
+  - [x] Audited 188 upstream Claude Skills; adopted 69 that map to roadmap phases, the 13 Agent Roles, and open backlog items.
+  - [x] Vendored at `.claude/skills/` with installers (`scripts/install-claude-skills.sh`, `install-skills.bat`) and mapping doc (`SKILLS.md`).
+  - [x] Made CSP `frame-ancestors` / `X-Frame-Options` environment-scoped via `CSP_FRAME_ANCESTORS` so staging and preview surfaces are testable without weakening production defaults.
+  - [x] Rejected `automatic-stateful-prompt-improver` (ships a `curl | bash` installer) on security grounds.
 - [x] **Engineering Governance & Registries**:
   - [x] `PROJECT_AUDIT.md` (17-point full audit report).
   - [x] `BACKLOG.md` (Prioritized issues registry).
@@ -78,7 +84,7 @@
 
 ## 7. Next Recommended Step (قدم بعدی پیشنهادی)
 
-1. Connect persistent PostgreSQL database via Prisma ORM as defined in `BACKLOG.md` (BL-005).
+1. Connect persistent PostgreSQL database via Prisma ORM as defined in `BACKLOG.md` (BL-005). *(Tooling ready: `postgresql-optimization`, `database-design-patterns`, `refactoring-surgeon` per `SKILLS.md`.)*
 2. Wire real IPG payment callback and SMS OTP verification upon business owner providing credentials.
 
 ---

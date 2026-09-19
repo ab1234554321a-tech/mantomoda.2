@@ -25,6 +25,8 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 - **Wholesale Price Security**: **UI Security ≠ Real Security**. Wholesale pricing fields are sanitized on the server before API response serialization (`ADR-003`).
 - **Cart & Orders**: Unit prices, wholesale minimums, and stock quantities are re-validated on the server at checkout.
 - **Testing**: Automated CI test suites (`npm test`) covering price security, approval state machine, and cart calculations.
+- **AI Skill Toolchain**: 69 curated Claude Skills vendored at `.claude/skills/` (ADR-006). **Read `SKILLS.md`** to load the skills mapped to the phase/role you are about to work on. Installers: `scripts/install-claude-skills.sh` (macOS/Linux), `install-skills.bat` (Windows).
+- **Frame/Embedding Policy**: `CSP_FRAME_ANCESTORS` env var (ADR-007). Default production behaviour unchanged (`frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`).
 
 ---
 
@@ -84,6 +86,13 @@ This document serves as an immediate, self-contained handoff snapshot for any AI
 - **Branch**: `main`
 - **CI Test Suite**: All tests passing (`npm test`).
 - **Server**: Running and healthy at port 3000 (`/api/health`).
+
+---
+
+## 11.b Skill Toolchain State (2026-09-20)
+- 188 upstream skills audited → **69 active** for this roadmap; groups: `meta backend devops qa frontend ux seo docs ai`.
+- Mapping of skill → roadmap phase (9.1→10) and → Agent Role (01..13) lives in `SKILLS.md`.
+- Skills are instruction files only; they do not mutate state. Any new adoption requires a security audit + ADR.
 
 ---
 
