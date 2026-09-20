@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0-rc1] - 2026-09-04
 
 ### Added
+- **`openapi.yaml` + `npm run api:check`** — the 49 endpoints are now a machine-readable contract, and a dependency-free checker derives the real surface from `app.js` and the router files and fails the build when spec and code disagree in either direction (wired into CI and the skills audit; mutation-tested). The `api-architect` skill flagged the absence, and documentation drift had already cost this project once. 43 documented paths, 47 schemas, no dangling `$ref`.
 - **12-Agent Ecosystem**: Added formalized specifications for all 12 Agent roles (`agents/01_SYSTEM_ARCHITECT.md` through `agents/12_RED_TEAM_ADVERSARIAL_TESTER.md`).
 - **Official MCP Server**: Built protocol-compliant stdio JSON-RPC 2.0 MCP server (`src/mcp/server.js`) on `@modelcontextprotocol/sdk`.
 - **Input Validation**: Added Zod schema validation middleware (`src/server/middlewares/validate.js`) for login, registration, wholesale applications, and order checkouts.

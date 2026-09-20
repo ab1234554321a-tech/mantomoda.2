@@ -205,6 +205,25 @@ if [ -f package.json ]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# 4b. API contract: openapi.yaml must match the routes the app really serves
+# ---------------------------------------------------------------------------
+if [ -f scripts/api-contract-check.mjs ]; then
+  if CONTRACT="$(timeout 60 node scripts/api-contract-check.mjs --quiet 2>&1)"; then
+    ok "قرارداد API با کد هم‌خوان است (openapi.yaml)"
+    echo "- قرارداد API: هم‌خوان" >> "$REPORT"
+  else
+    bad "قرارداد API از کد جدا شده — جزئیات با: npm run api:check"
+    {
+      echo "## قرارداد API"
+      echo
+      echo '```'
+      printf '%s\n' "$CONTRACT"
+      echo '```'
+    } >> "$REPORT"
+  fi
+fi
+
 say "۵) آماده‌بودن انتشار (preflight)"
 if [ -f scripts/preflight.sh ]; then
   # Run without the live server so it reports only configuration facts.

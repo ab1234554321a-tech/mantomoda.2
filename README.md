@@ -166,7 +166,26 @@ what makes customers able to buy; see `HOSTING-GUIDE.md`.
 
 ---
 
-## 12. The Skills Toolchain — What It Actually Does (ADR-023)
+## 12. API Contract (openapi.yaml)
+
+The 49 endpoints the application serves are described in [`openapi.yaml`](openapi.yaml) — request
+bodies, response envelopes, roles, rate limits and the demo-mode exception.
+
+The contract is **verified against the running code**, not maintained by hand:
+
+```bash
+npm run api:check
+```
+
+The check derives the real surface from `app.js` (mount points) and the router files, compares it with
+the spec in both directions, and fails when a route exists in the code but not in the spec, or the spec
+documents a route the app no longer serves. It runs in CI and in `npm run skills-audit`. This is
+deliberate: this project has already lost time to documentation that described a different
+application, so the contract is only useful if it is *true*.
+
+---
+
+## 13. The Skills Toolchain — What It Actually Does (ADR-023)
 
 69 Claude skills are vendored in [`.claude/skills/`](.claude/skills) and mapped to project phases in
 [`SKILLS.md`](SKILLS.md). They are not documentation: their own scanners run against `src/` and their

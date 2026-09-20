@@ -20,7 +20,8 @@
     "preflight": "bash scripts/preflight.sh",
     "skills-audit": "bash scripts/skills-audit.sh",
     "docker:up": "docker compose up -d --build",
-    "docker:logs": "docker compose logs -f --tail=100 manto"
+    "docker:logs": "docker compose logs -f --tail=100 manto",
+    "api:check": "node scripts/api-contract-check.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",

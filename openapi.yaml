@@ -1,0 +1,1985 @@
+# =============================================================================
+#  Manto Moda — API contract (OpenAPI 3.1)
+#
+#  This file is checked against the running code by scripts/api-contract-check.mjs
+#  (`npm run api:check`, also a CI step): a route that exists in the app but not
+#  here — or here but not in the app — fails the build. The contract is only
+#  worth having if it is true (see ADR-023 on documentation drift).
+# =============================================================================
+openapi: 3.1.0
+info:
+  title: Manto Moda API
+  version: 0.4.0-rc1
+  description: |
+    Persian RTL storefront and back office for a manto/coat retailer.
+
+    **Authentication** — every response that carries a user or an order is scoped to the
+    bearer token; roles are `REGULAR`, `WHOLESALE` and `ADMIN`. Orders and invoices are
+    ownership-checked (a customer reading another customer's order gets 403, never 404-by-luck).
+
+    **Prices** — wholesale prices are stripped server-side for anyone who is not a verified
+    wholesale partner (ADR-003), and every charged amount is recomputed on the server at
+    checkout; a client-supplied price is discarded.
+
+    **Money** — amounts are integer Toman, never floats.
+
+    **Demo mode** — `POST /api/auth/switch-role` mints a token for a requested role with no
+    password and exists for demonstrations. On a live shop it answers 404 (ADR-024);
+    `GET /api/config` tells a client which kind of deployment it is talking to.
+
+    **Rate limits** — `/api/auth` is limited per IP (30 requests / 15 minutes in production),
+    the rest of the API 300/minute. 429 responses carry a Persian message.
+  license:
+    name: Proprietary
+servers:
+  - url: https://shop.example.ir
+    description: production (replace with the real domain)
+  - url: http://localhost:3000
+    description: local development
+tags:
+  - name: Meta
+    description: Health, runtime configuration and SEO endpoints
+  - name: Auth
+    description: Sessions, registration and mobile verification
+  - name: Catalog
+    description: Public product catalogue
+  - name: Wholesale
+    description: Wholesale applications
+  - name: Cart
+    description: Server-side pricing
+  - name: Orders
+    description: Checkout and order history
+  - name: Invoices
+    description: Invoices (JSON + signed printable link)
+  - name: Payments
+    description: Iranian IPG adapter flow
+  - name: Admin
+    description: Back office (admin role required)
+  - name: Demo
+    description: Demonstration-only endpoints (absent in production)
+
+security:
+  - {}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: HMAC-SHA256 JWT issued by /api/auth/login or /api/auth/register.
+  schemas:
+    Error:
+      type: object
+      description: "Every failure answers in this shape: a machine code plus a Persian message."
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+        message:
+          type: string
+      example:
+        success: "false"
+        error: "INVALID_CREDENTIALS"
+        message: "اطلاعات ورود نادرست است."
+    LoginRequest:
+      type: object
+      properties:
+        identifier:
+          type: string
+        password:
+          type: string
+      example:
+        identifier: "neda.alavi@gmail.com"
+        password: "…"
+    RegisterRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+      example:
+        fullName: "ندا علوی"
+        email: "a@b.ir"
+        phone: "09120000000"
+        password: "…"
+    OtpRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+      example:
+        phone: "09120000000"
+    OtpVerify:
+      type: object
+      properties:
+        phone:
+          type: string
+        code:
+          type: string
+      example:
+        phone: "09120000000"
+        code: "123456"
+    SwitchRoleRequest:
+      type: object
+      description: Demo only.
+      properties:
+        targetRole:
+          type: string
+          description: GUEST, REGULAR, PENDING, WHOLESALE, ADMIN
+      example:
+        targetRole: "ADMIN"
+    User:
+      type: object
+      description: A user as the API exposes it — never includes the password hash.
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+        isWholesaleVerified:
+          type: boolean
+        companyName:
+          type: string
+      example:
+        id: "usr-1"
+        email: "a@b.ir"
+        role: "REGULAR"
+    Variant:
+      type: object
+      properties:
+        id:
+          type: string
+        color:
+          type: string
+        size:
+          type: string
+        stock:
+          type: integer
+      example:
+        id: "var-1"
+        color: "مشکی"
+        size: "38"
+        stock: 12
+    Product:
+      type: object
+      description: Wholesale fields are present only for verified wholesale partners and admins.
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        material:
+          type: string
+        season:
+          type: string
+        description:
+          type: string
+        retailPrice:
+          type: integer
+        wholesalePrice:
+          type: integer
+        wholesaleMinQuantity:
+          type: integer
+        images:
+          type: array
+          items: {}
+        variants:
+          type: array
+          items: {}
+        isArchived:
+          type: boolean
+      example:
+        id: "prod-001"
+        title: "مانتو ترنچ"
+        sku: "MM-MANTO-TRENCH"
+        retailPrice: 1850000
+        variants: [{'id': 'var-1', 'stock': 12}]
+    CartCalculateRequest:
+      type: object
+      description: The cart is re-priced server-side; any price sent by the client is ignored.
+      properties:
+        items:
+          type: array
+          items: {}
+        couponCode:
+          type: string
+        province:
+          type: string
+      example:
+        items: [{'productId': 'prod-001', 'variantId': 'var-1', 'quantity': 2}]
+        couponCode: "WELCOME10"
+    ShippingAddress:
+      type: object
+      properties:
+        recipientName:
+          type: string
+        phone:
+          type: string
+          description: Iranian mobile
+        province:
+          type: string
+        city:
+          type: string
+        fullAddress:
+          type: string
+        postalCode:
+          type: string
+      example:
+        recipientName: "سارا رضایی"
+        phone: "09121112233"
+        province: "تهران"
+        city: "تهران"
+        fullAddress: "خیابان ولیعصر پلاک ۱"
+    OrderCreateRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items: {}
+        shippingAddress:
+          type: ShippingAddress
+        paymentMethod:
+          type: ONLINE_GATEWAY | BANK_TRANSFER_RECEIPT
+        couponCode:
+          type: string
+      example:
+        items: [{'productId': 'prod-001', 'variantId': 'var-1', 'quantity': 1}]
+        paymentMethod: "ONLINE_GATEWAY"
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        variantId:
+          type: string
+        productTitle:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: integer
+        totalPrice:
+          type: integer
+    Order:
+      type: object
+      description: Totals are stored at checkout time and re-read for invoices, so a later price change never rewrites history (ADR-018).
+      properties:
+        id:
+          type: string
+        orderNumber:
+          type: string
+          description: MM-ORD-YYYY-NNNNN, monotonic
+        status:
+          type: string
+          description: PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+        paymentStatus:
+          type: string
+        orderType:
+          type: string
+          description: RETAIL, WHOLESALE
+        items:
+          type: array
+          items: {}
+        subtotal:
+          type: integer
+        discount:
+          type: integer
+        shipping:
+          type: integer
+        payableAmount:
+          type: integer
+        couponCode:
+          type: string
+        shippingAddress:
+          type: ShippingAddress
+        createdAt:
+          type: string
+          description: date-time
+      example:
+        orderNumber: "MM-ORD-2026-00123"
+        status: "CONFIRMED"
+        payableAmount: 1850000
+    OrderStatusUpdate:
+      type: object
+      description: Only legal state-machine transitions are accepted (ADR-011).
+      properties:
+        status:
+          type: string
+      example:
+        status: "SHIPPED"
+    CouponInput:
+      type: object
+      properties:
+        code:
+          type: string
+        type:
+          type: PERCENT | FIXED
+        value:
+          type: integer
+        minBasket:
+          type: integer
+        maxDiscount:
+          type: integer
+        usageLimit:
+          type: integer
+        perUserLimit:
+          type: integer
+        expiresAt:
+          type: string
+          description: date-time
+        appliesTo:
+          type: ALL | RETAIL | WHOLESALE
+      example:
+        code: "WELCOME10"
+        type: "PERCENT"
+        value: 10
+    ShopSettings:
+      type: object
+      description: Editable from the panel so a shipping price is a business decision, not a deploy (ADR-017).
+      properties:
+        shipping:
+          type: object
+        inventory:
+          type: object
+        shop:
+          type: object
+      example:
+        shipping: {'flatFee': 45000, 'freeShippingThreshold': 2000000}
+    InventoryBulk:
+      type: object
+      properties:
+        updates:
+          type: array
+          items: {}
+        threshold:
+          type: integer
+      example:
+        updates: [{'productId': 'prod-001', 'variantId': 'var-1', 'stock': 8}]
+    WholesaleApplicationRequest:
+      type: object
+      properties:
+        companyName:
+          type: string
+        economicCode:
+          type: string
+        province:
+          type: string
+        city:
+          type: string
+        businessPhone:
+          type: string
+        storeType:
+          type: PHYSICAL_STORE | ONLINE_SHOP | BOTH
+        businessAddress:
+          type: string
+    WholesaleReview:
+      type: object
+      properties:
+        status:
+          type: APPROVED | REJECTED
+        adminNotes:
+          type: string
+      example:
+        status: "APPROVED"
+    PaymentRequest:
+      type: object
+      properties:
+        orderId:
+          type: string
+      example:
+        orderId: "ord-1"
+    PaymentVerifyRequest:
+      type: object
+      description: Server-to-server verification; idempotent per order.
+      properties:
+        orderId:
+          type: string
+        authority:
+          type: string
+      example:
+        orderId: "ord-1"
+    Invoice:
+      type: object
+      description: Printable page is served from the signed link; this JSON is for the owner/accountant.
+      properties:
+        orderNumber:
+          type: string
+        shop:
+          type: object
+        customer:
+          type: object
+        lines:
+          type: array
+          items: {}
+        totals:
+          type: object
+        paymentStatus:
+          type: string
+    RuntimeConfig:
+      type: object
+      properties:
+        version:
+          type: string
+        environment:
+          type: string
+        demoMode:
+          type: boolean
+        demoData:
+          type: boolean
+      example:
+        version: "0.4.0-rc1"
+        environment: "production"
+        demoMode: false
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+        uptimeSeconds:
+          type: integer
+        memory:
+          type: object
+        persistence:
+          type: object
+        demoMode:
+          type: boolean
+      example:
+        status: "healthy"
+        version: "0.4.0-rc1"
+
+    # --- Response envelopes -------------------------------------------------
+    # Every successful response is wrapped in { success: true, data: … }; these
+    # schemas describe the wrapper, and the field-level shapes above are reused
+    # inside `data`. Keeping one envelope keeps client error handling trivial.
+    ApiMessage:
+      type: object
+      description: "Success envelope with a human-readable Persian message."
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+      example: { success: true, message: "انجام شد." }
+    AuthSession:
+      type: object
+      description: "A signed-in session: the JWT plus the user it belongs to."
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: "HMAC-SHA256 JWT, valid 7 days by default (JWT_EXPIRES_IN)."
+            user:
+              $ref: '#/components/schemas/User'
+      example: { success: true, data: { token: "eyJhbGciOi…", user: { role: "REGULAR" } } }
+    OtpPolicy:
+      type: object
+      description: "What the OTP service enforces, so the UI does not have to guess."
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            length: { type: integer }
+            ttlSeconds: { type: integer }
+            maxAttempts: { type: integer }
+            resendAfterSeconds: { type: integer }
+            provider: { type: string }
+    ProductList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        meta:
+          type: object
+          description: "Pagination envelope (page, limit, total, totalPages, hasMore)."
+    CategoryList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              count: { type: integer }
+    CartSummary:
+      type: object
+      description: "Prices recomputed on the server. `notices` explains business rules (bulk thresholds, stock)."
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItem'
+            subtotal: { type: integer }
+            discount: { type: integer }
+            shipping: { type: integer }
+            payable: { type: integer }
+            couponCode: { type: string }
+            notices:
+              type: array
+              items: { type: string }
+    OrderList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        meta:
+          type: object
+          description: "Pagination envelope for back-office lists."
+    InvoiceLink:
+      type: object
+      description: "A signed, expiring URL anyone holding it can open — no login, no listing (ADR-018)."
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            url: { type: string }
+            expiresAt: { type: string }
+    WholesaleApplication:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            id: { type: string }
+            companyName: { type: string }
+            city: { type: string }
+            businessPhone: { type: string }
+            businessAddress: { type: string }
+            economicCode: { type: string }
+            status: { type: string, description: "PENDING | APPROVED | REJECTED" }
+            adminNotes: { type: string }
+            createdAt: { type: string }
+    WholesaleApplicationList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WholesaleApplication'
+    AdminStats:
+      type: object
+      description: "Recognised revenue counts paid/confirmed orders only; cancellations are excluded."
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            revenueToday: { type: integer }
+            revenueThisMonth: { type: integer }
+            revenueAllTime: { type: integer }
+            averageOrderValue: { type: integer }
+            ordersToday: { type: integer }
+            ordersThisMonth: { type: integer }
+            billableOrders: { type: integer }
+            cancelledOrders: { type: integer }
+            pendingOrdersCount: { type: integer }
+            awaitingPayment: { type: integer }
+            topProducts:
+              type: array
+              items: { type: object }
+            lowStock:
+              type: array
+              items: { type: object }
+    CouponList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              code: { type: string }
+              type: { type: string }
+              value: { type: integer }
+              usageCount: { type: integer }
+              isActive: { type: boolean }
+              expiresAt: { type: string }
+    LowStockList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              productId: { type: string }
+              productTitle: { type: string }
+              variantId: { type: string }
+              color: { type: string }
+              size: { type: string }
+              stock: { type: integer }
+              threshold: { type: integer }
+    AuditLogList:
+      type: object
+      description: "Every successful admin write, with secrets redacted (ADR-020)."
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              actorEmail: { type: string }
+              action: { type: string }
+              target: { type: string }
+              ip: { type: string }
+              createdAt: { type: string }
+    PaymentInit:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            redirectUrl: { type: string, description: "Where to send the customer's browser." }
+            authority: { type: string }
+    PaymentStatus:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            orderId: { type: string }
+            paymentStatus: { type: string }
+            refId: { type: string }
+            paidAt: { type: string }
+
+    ProductInput:
+      type: object
+      description: "Product payload for create/update. Validation is server-side and refuses the easy mistakes: negative or non-integer prices, a missing variant, a duplicate colour+size, a wholesale price that is not below retail."
+      required: [title, category, retailPrice, variants]
+      properties:
+        title: { type: string, description: "Displayed name (Persian or English)." }
+        category: { type: string }
+        material: { type: string }
+        season: { type: string }
+        description: { type: string }
+        retailPrice: { type: integer, description: "Toman, non-negative integer." }
+        wholesalePrice: { type: integer, description: "Toman, must be below retailPrice." }
+        wholesaleMinQuantity: { type: integer }
+        sku: { type: string, description: "Latin-only warehouse code; generated from the title when omitted." }
+        isFeatured: { type: boolean }
+        variants:
+          type: array
+          items:
+            type: object
+            properties:
+              color: { type: string }
+              size: { type: string }
+              stock: { type: integer }
+              colorHex: { type: string }
+      example:
+        title: "مانتو کتی اداری"
+        category: "مانتو کتی و اداری"
+        retailPrice: 1850000
+        wholesalePrice: 1295000
+        variants: [{ color: "مشکی", size: "38", stock: 12 }]
+
+    # Wrapper used by endpoints whose payload is a documented set of fields above
+    # (kept explicit rather than loosening the whole contract to `object`).
+    AdminSettings:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          $ref: '#/components/schemas/ShopSettings'
+    ProductEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          $ref: '#/components/schemas/Product'
+    CouponEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+    OrderEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          $ref: '#/components/schemas/Order'
+    MessageEnvelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: { type: object }
+
+paths:
+  /api/config:
+    get:
+      tags: [Meta]
+      summary: "Public runtime configuration: version, environment, demoMode, demoData — the client uses this to hide demo-only UI on a live shop (ADR-024)"
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeConfig'
+  /api/health:
+    get:
+      tags: [Meta]
+      summary: "Liveness/readiness: version (from package.json), uptime, memory, persistence state"
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /robots.txt:
+    get:
+      tags: [Meta]
+      summary: robots.txt
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /sitemap.xml:
+    get:
+      tags: [Meta]
+      summary: sitemap.xml with canonical product URLs
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /product/{slug}:
+    get:
+      tags: [Meta]
+      summary: "Pre-rendered product page: real title/description/OpenGraph/JSON-LD for crawlers and link previews (ADR-015)"
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in with e-mail/phone and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a retail customer account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '409':
+          description: Conflict (duplicate, insufficient stock)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: Send a one-time SMS code to a mobile number
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpPolicy'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify a one-time code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerify'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/otp/policy:
+    get:
+      tags: [Auth]
+      summary: OTP policy (length, TTL, attempt limits) so the UI matches the server
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpPolicy'
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: The signed-in user, as the server sees them (never the token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/products:
+    get:
+      tags: [Catalog]
+      summary: Public catalogue, paginated and filterable. Wholesale prices are stripped for guests and retail customers (ADR-003)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+  /api/products/categories:
+    get:
+      tags: [Catalog]
+      summary: Category list with product counts
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryList'
+  /api/products/{id}:
+    get:
+      tags: [Catalog]
+      summary: One product by id or slug (sanitised per role)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/wholesale/my-application:
+    get:
+      tags: [Wholesale]
+      summary: The caller's own wholesale application and its status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WholesaleApplication'
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/wholesale/apply:
+    post:
+      tags: [Wholesale]
+      summary: Apply for a wholesale account (starts PENDING; an admin approves)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WholesaleApplicationRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WholesaleApplication'
+        '409':
+          description: Conflict (duplicate, insufficient stock)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/cart/calculate:
+    post:
+      tags: [Cart]
+      summary: "Server-side cart pricing: line totals, bulk thresholds, shipping, coupon and payable amount. The client never computes a price that is charged (ADR-017)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartCalculateRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartSummary'
+        '422':
+          description: Business rule rejected (e.g. COUPON_REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/orders:
+    post:
+      tags: [Orders]
+      summary: Place an order. Stock is decremented atomically (409 on shortage) and prices are recomputed server-side (ADR-011)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate, insufficient stock)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Business rule rejected (e.g. COUPON_REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/orders/my-orders:
+    get:
+      tags: [Orders]
+      summary: The caller's own orders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: One order — the owner, or an admin. Other customers get 403 (BOLA)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '403':
+          description: Authenticated but not allowed (ownership/RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/orders/{id}/invoice:
+    get:
+      tags: [Invoices]
+      summary: Structured invoice JSON (owner or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '403':
+          description: Authenticated but not allowed (ownership/RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/orders/{id}/invoice-link:
+    get:
+      tags: [Invoices]
+      summary: Mints a signed, expiring shareable invoice URL (no login needed to open it)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceLink'
+        '403':
+          description: Authenticated but not allowed (ownership/RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payments/request:
+    post:
+      tags: [Payments]
+      summary: "Start a payment: returns the gateway redirect URL for the order"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInit'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payments/callback:
+    get:
+      tags: [Payments]
+      summary: Gateway callback (browser return). Verifies server-side and redirects back to the shop
+      parameters:
+        - name: Authority
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: Status
+          in: query
+          required: false
+          schema:
+            type: string
+      security: []
+      responses:
+        '302':
+          description: Redirect to the shop
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /api/payments/verify:
+    post:
+      tags: [Payments]
+      summary: Verify a payment server-to-server and mark the order paid (idempotent)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVerifyRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '409':
+          description: Conflict (duplicate, insufficient stock)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payments/status/{orderId}:
+    get:
+      tags: [Payments]
+      summary: Payment status of an order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatus'
+        '403':
+          description: Authenticated but not allowed (ownership/RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: "Dashboard: recognised revenue (today/month/all-time), order counts, top products, low stock, pending applications"
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Authenticated but not allowed (ownership/RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/settings:
+    get:
+      tags: [Admin]
+      summary: "Shop settings: shipping tariffs per province, free-shipping threshold, inventory thresholds, invoice identity"
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopSettings'
+  /api/admin/settings:
+    put:
+      tags: [Admin]
+      summary: Update shop settings (applied immediately, no deploy)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShopSettings'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/coupons:
+    get:
+      tags: [Admin]
+      summary: All coupons, newest first
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponList'
+  /api/admin/coupons:
+    post:
+      tags: [Admin]
+      summary: Create a coupon (percent/fixed, limits, expiry, retail/wholesale target)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/coupons/{id}:
+    put:
+      tags: [Admin]
+      summary: Edit a coupon
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponInput'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/coupons/{id}:
+    delete:
+      tags: [Admin]
+      summary: Archive a coupon (existing orders keep their discount)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/audit-log:
+    get:
+      tags: [Admin]
+      summary: Who changed what, when and from which IP (secrets redacted)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+  /api/admin/wholesale/applications:
+    get:
+      tags: [Admin]
+      summary: Wholesale applications, optionally filtered
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WholesaleApplicationList'
+  /api/admin/wholesale/applications/{id}/review:
+    post:
+      tags: [Admin]
+      summary: Approve or reject an application (approval also notifies the applicant)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WholesaleReview'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products:
+    get:
+      tags: [Admin]
+      summary: Products including archived ones, with stock totals
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+  /api/admin/products:
+    post:
+      tags: [Admin]
+      summary: "Create a product (validated: non-negative integer prices, unique slug, Latin SKU, no duplicate colour+size, wholesale below retail)"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products/{id}:
+    put:
+      tags: [Admin]
+      summary: Update a product (slug stays stable across title edits)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products/{id}:
+    delete:
+      tags: [Admin]
+      summary: "Archive a product: removed from sale, order history untouched"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products/{id}/restore:
+    post:
+      tags: [Admin]
+      summary: Restore an archived product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/inventory/bulk:
+    put:
+      tags: [Admin]
+      summary: Update stock for several variants at once
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryBulk'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/inventory/low-stock:
+    get:
+      tags: [Admin]
+      summary: Variants at or below the low-stock threshold
+      parameters:
+        - name: threshold
+          in: query
+          required: false
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LowStockList'
+  /api/admin/orders:
+    get:
+      tags: [Admin]
+      summary: Search/filter/paginate orders (number, customer, mobile, city, coupon; status, payment, type, dates)
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: paymentStatus
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: orderType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+  /api/admin/orders/export.csv:
+    get:
+      tags: [Admin]
+      summary: CSV export (UTF-8 BOM + CRLF so Excel opens Persian correctly), honours the same filters
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+  /api/admin/orders/{id}/status:
+    put:
+      tags: [Admin]
+      summary: Advance the order state machine. Illegal jumps (e.g. DELIVERED → PENDING) are refused
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusUpdate'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products/{id}/images:
+    post:
+      tags: [Admin]
+      summary: Upload product images (multipart). Type/size validated, re-encoded to WebP with a thumbnail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Payload too large (upload limit)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/products/{id}/images:
+    delete:
+      tags: [Admin]
+      summary: Remove a product image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/switch-role:
+    post:
+      tags: [Demo]
+      summary: DEMO ONLY — signs a token for a role without a password. **404 in production** unless ALLOW_DEMO_MODE=true (ADR-024)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwitchRoleRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
