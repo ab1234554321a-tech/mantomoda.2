@@ -63,6 +63,36 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 ok "همه تغییرات کامیت شده‌اند"
 
+# --- A shallow clone cannot be pushed to GitHub ------------------------------
+# GitHub refuses "shallow update not allowed", which looks like a credential
+# error but is not. Complete the history first, from the remote we already have.
+if [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+  warn "این مخزن shallow است — گیت‌هاب push از مخزن shallow را رد می‌کند"
+  if git remote get-url origin >/dev/null 2>&1; then FETCH_FROM="origin"; else FETCH_FROM="$REPO_URL"; fi
+  echo "  در حال کامل‌کردن تاریخچه از $FETCH_FROM …"
+  if git fetch --unshallow "$FETCH_FROM" 2>&1 | tail -2; then
+    ok "تاریخچه کامل شد ($(git rev-list --count HEAD) کامیت)"
+  else
+    die "کامل‌کردن تاریخچه ناموفق بود — اتصال اینترنت یا صحت REPO_URL را بررسی کن"
+  fi
+fi
+
+# --- Divergence: the remote must be an ancestor of what we are sending -------
+REMOTE_BEFORE="$(git ls-remote "$REPO_URL" "refs/heads/$BRANCH" 2>/dev/null | awk '{print $1}')"
+if [ -n "$REMOTE_BEFORE" ] && ! git cat-file -e "$REMOTE_BEFORE^{commit}" 2>/dev/null; then
+  # The remote tip is unknown locally (another machine pushed). Fetch just that
+  # history — no working-tree change — so the ancestor test below can run and
+  # explain the situation instead of letting git fail with a raw error.
+  git fetch -q "$REPO_URL" "$BRANCH" 2>/dev/null || true
+fi
+if [ -n "$REMOTE_BEFORE" ] && git cat-file -e "$REMOTE_BEFORE^{commit}" 2>/dev/null; then
+  if ! git merge-base --is-ancestor "$REMOTE_BEFORE" HEAD 2>/dev/null; then
+    warn "شاخه $BRANCH روی گیت‌هاب کامیت‌هایی دارد که محلی نداری (واگرایی)"
+    die "اول \"git pull origin $BRANCH\" را بزن، یا اگر مطمئنی که نسخه محلی درست است: FORCE=1"
+  fi
+  ok "تاریخچه محلی روی نسخه گیت‌هاب سوار می‌شود (بدون بازنویسی تاریخچه)"
+fi
+
 COMMIT_COUNT="$(git rev-list --count HEAD)"
 LAST_COMMIT="$(git log -1 --format='%h %s')"
 say "آماده ارسال"
@@ -78,16 +108,23 @@ AUTH_URL="$(printf '%s' "$REPO_URL" | sed -E "s#https://#https://x-access-token:
 PUSH_ARGS=(--set-upstream "$AUTH_URL" "$BRANCH")
 [ "$FORCE" = "1" ] && PUSH_ARGS=(--force "${PUSH_ARGS[@]}")
 
-if GIT_TERMINAL_PROMPT=0 git push "${PUSH_ARGS[@]}" 2>&1 | sed -E "s#${TOKEN}#***#g"; then
+# Run the push, then print its output with the token masked. The status is read
+# from git itself (not from the pipe) so a rejected push can never look like a
+# success.
+PUSH_LOG=""
+PUSH_STATUS=0
+PUSH_LOG="$(GIT_TERMINAL_PROMPT=0 git push "${PUSH_ARGS[@]}" 2>&1)" || PUSH_STATUS=$?
+printf '%s\n' "$PUSH_LOG" | sed -E "s#${TOKEN}#***#g"
+
+if [ "$PUSH_STATUS" -eq 0 ]; then
   ok "ارسال انجام شد"
 else
-  STATUS=$?
   echo
   echo "  علت‌های رایج این خطا:"
   echo "   • توکن منقضی/نامعتبر است، یا دسترسی Contents: Read and write ندارد"
   echo "   • توکن فقط برای مخزن دیگری ساخته شده است"
   echo "   • تاریخچه گیت‌هاب و محلی واگرا شده‌اند (FORCE=1 فقط اگر مطمئنی)"
-  exit $STATUS
+  exit "$PUSH_STATUS"
 fi
 
 unset TOKEN AUTH_URL
