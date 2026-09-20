@@ -108,11 +108,35 @@ if [ -n "$REMOTE_BEFORE" ] && git cat-file -e "$REMOTE_BEFORE^{commit}" 2>/dev/n
   ok "تاریخچه محلی روی نسخه گیت‌هاب سوار می‌شود (بدون بازنویسی تاریخچه)"
 fi
 
+# Which commits are about to travel (used by the scope check below).
+REPO_URL_REF="origin/$BRANCH..HEAD"
+if ! git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then REPO_URL_REF="HEAD"; fi
+if ! git log --oneline "$REPO_URL_REF" >/dev/null 2>&1; then REPO_URL_REF="HEAD"; fi
+
 COMMIT_COUNT="$(git rev-list --count HEAD)"
 LAST_COMMIT="$(git log -1 --format='%h %s')"
 say "آماده ارسال"
 echo "  تعداد کامیت‌های محلی: $COMMIT_COUNT"
 echo "  آخرین کامیت: $LAST_COMMIT"
+
+# --- Scope check: catch GitHub's least obvious rejection before it happens ----
+# A token with `repo` but without `workflow` is refused with a message that
+# sounds like a permissions problem ("refusing to allow a Personal Access Token
+# to create or update workflow") while everything else about the token is fine.
+# The scopes are readable from the API, so they are checked up front.
+if command -v curl >/dev/null 2>&1; then
+  SCOPES="$(curl -s -I -H "Authorization: Bearer $TOKEN" https://api.github.com/user 2>/dev/null \
+    | tr -d '\r' | awk 'tolower($1) == "x-oauth-scopes:" { $1=""; print substr($0,2) }')"
+  if [ -n "$SCOPES" ]; then
+    ok "دسترسی‌های توکن: $SCOPES"
+    TOUCHES_WORKFLOWS="$(git log --name-only --format= "$REPO_URL_REF" 2>/dev/null | grep -c '^\.github/workflows/' || true)"
+    if [ "${TOUCHES_WORKFLOWS:-0}" -gt 0 ] && ! printf '%s' "$SCOPES" | grep -q 'workflow'; then
+      warn "در این ارسال فایل .github/workflows/ تغییر کرده، ولی توکن دسترسی workflow ندارد"
+      die "همان توکن را با دسترسی workflow بساز (یک کلیک، از قبل پر شده):
+     https://github.com/settings/tokens/new?description=mantomoda-push&scopes=repo,workflow"
+    fi
+  fi
+fi
 
 # --- Push --------------------------------------------------------------------
 # The token travels in the remote URL for this single command and is never
