@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+- **`scripts/skills-audit.sh`** (`npm run skills-audit`): runs the vendored skill scanners for real — OWASP patterns, secret scan, documentation/ADR coverage — alongside the project's own gates (tests, accessibility, dependency audit, preflight) and writes a timestamped report to `reports/`. Findings are triaged, not obeyed: a "critical" that contradicts the architecture is recorded as a false positive (ADR-023).
+- **`scripts/push-to-github.sh`**: pushes the current commit to the GitHub remote in one command. Accepts a token as an argument, an environment variable, or a hidden prompt; refuses to run with uncommitted changes; never echoes the token; and prints the local and remote HEAD afterwards as proof that the upload landed.
 - **Deployment & release layer (ADR-021)** — the project could be built but not launched; it now ships with everything needed to go live on a real server.
   - **`Dockerfile`** (production): Debian slim (the environment family where the `sharp` upload pipeline was verified), production-only dependencies, non-root `node` user, healthcheck via Node, `STOPSIGNAL SIGTERM` so the data snapshot is flushed on stop.
   - **`docker-compose.yml`**: restart-always, `./data` bind mount (orders **and** uploaded photos survive redeploys), memory limit, log rotation, Node port bound to `127.0.0.1` only, and a daily **backup sidecar**.
@@ -46,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI pipeline (`.github/workflows/ci.yml`)**: Runs the 6 test suites on Node 20 and 22, a blocking dependency audit, a committed-secrets check, and state-file validation. Closes the long-standing "GitHub Actions CI pending PAT" gap.
 
 ### Fixed
+- **Back-office stored XSS (ADR-022)** — output encoding was missing on customer-supplied text. The wholesale application fields a *customer* types (`companyName`, `businessAddress`, `businessPhone`, `city`, `economicCode`) and the registration name/e-mail were rendered in the **admin panel** without encoding, so a crafted application executed script inside the owner's session the moment she opened the wholesale queue, exposing every customer's delivery data. The delivery address on the customer's own order page had the same gap.
+  - Added one encoder (`escapeHtml`/`escapeAttr`) and applied it to all 36 human-entered interpolations in the storefront SPA; safe-by-construction `textContent`/`value` sinks are used where the markup allows.
+  - New **Level 9 test suite** (`tests/escaping.test.js`) covers it three ways: hostile payloads through the real encoder, a wiring check that every risky interpolation in the shipped client is wrapped, and real HTTP requests proving the server-rendered product page and printable invoice print the payload as text. Reverting any one fix fails the suite (verified by mutation testing).
+- **Order-number collisions** — order numbers were built from `Math.random()` over a 9,000-value space, so two orders collided after roughly a hundred sales in a year, and because invoices are located *by order number* a customer could be shown someone else's invoice. Numbers are now drawn from a persisted monotonic sequence with a random start, guarded against collisions, and identity fields (product/coupon/audit ids, mock payment reference) use `crypto` instead of `Math.random()`. Regression test asserts uniqueness across 300 orders plus unambiguous invoice lookup.
+
+
 - **`path is not defined` after the app/index split**: caught by the new Level-7 HTTP tests; the SPA fallback now uses the shared `paths.js` module instead of a removed import.
 - **Test suite writing to the production snapshot**: the test runner now sets `NODE_ENV=test` and `PERSIST_DATA=false` *before* importing the suites, so tests can never touch real data (verified).
 - **Dependency vulnerabilities**: `npm audit` reported 3 moderate advisories (`qs` via express/body-parser). Remediated — `npm audit --omit=dev` now reports **0 vulnerabilities**.

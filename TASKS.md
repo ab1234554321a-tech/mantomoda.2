@@ -6,6 +6,14 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 12: Security Hardening Driven by the Skills Audit** — the vendored Claude skills were executed against `src/` and the two defects they surfaced were fixed and locked down (ADR-022, ADR-023).
+  - [x] Run the skill scanners for real: `.claude/skills/security-auditor/scripts/owasp-check.py src` and `detect-secrets.sh`, plus `technical-writer/validate-docs.sh` — results triaged, false positives recorded rather than "fixed".
+  - [x] **Fix: order-number collisions.** `Math.random()` gave order numbers a 9,000-value space (collision expected after ~110 orders) while invoices are looked up *by number*; numbers now come from a persisted monotonic sequence with a random start, and product/coupon/audit ids and the mock payment reference use `crypto`.
+  - [x] **Fix: back-office stored XSS.** Customer-supplied wholesale fields (company name, address, phone, city, economic code) and registration name/e-mail were rendered into the admin panel without encoding; all 36 human-entered interpolations now pass through one encoder (`escapeHtml`/`escapeAttr`), with `textContent`/`value` sinks preferred.
+  - [x] **Regression guards**: order-number uniqueness across 300 orders (in the commerce suite) and a new **Level 9** output-encoding suite (`tests/escaping.test.js`) covering encoder behaviour, every risky interpolation in the shipped client, and the server-rendered product page + printable invoice over real HTTP. Mutation-tested: reverting a fix turns the suite red.
+  - [x] **`scripts/skills-audit.sh`** (`npm run skills-audit`): one command that re-runs every skill scanner plus the project gates and writes `reports/skills-audit-<stamp>.md`.
+  - [x] **`scripts/push-to-github.sh`**: publishes the current commit to GitHub in one command (token via argument, environment variable or hidden prompt; refuses on a dirty tree; prints local vs remote HEAD as proof).
+  - [ ] *(Owner action)* Paste a GitHub access token once so the code leaves this machine — see `README.md` §12.
 - [x] **Phase 11: Deployment & Release** — Docker image, compose (data volume + backup sidecar), Nginx/HTTPS, systemd unit, one-command server installer, pre-launch audit and the Persian hosting runbook (ADR-021).
 - [x] **Phase 10: Back-Office & Commerce** — shop settings, centralised pricing, coupons, product management with archive, inventory operations with owner alerts, order search/CSV export, signed printable invoices, admin dashboard and audit trail (ADR-017..020). 8 test suites green.
 - [x] **Phase 9.5: Revenue-Readiness Hardening** — all 12 items of `EXECUTION_PLAN.md` (persistence, inventory integrity, order state machine + audit trail, SMS notifications, process hardening, supertest HTTP tests, pagination, image upload, SEO, accessibility, backups, docs/release). ADR-010..016.

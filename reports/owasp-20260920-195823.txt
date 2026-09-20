@@ -1,0 +1,350 @@
+
+============================================================
+OWASP Top 10 Static Analysis Report
+============================================================
+
+Summary:
+  Critical: 7
+  High:     40
+  Medium:   0
+  Low:      1
+  Total:    48
+
+Findings:
+------------------------------------------------------------
+
+[[91mCRITICAL[0m] OWASP-0003: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/server/services/payment/provider.js:50
+  Evidence: `Payment provider "${name}" is selected but not fully configured. ` +
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0004: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/server/services/sms/provider.js:38
+  Evidence: `SMS provider "${name}" is selected but not fully configured. ` +
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0044: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:505
+  Evidence: <button onclick="selectVariant('${v.id}')" class="px-3 py-1.5 rounded-xl border text-xs font-medium 
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0045: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:521
+  Evidence: <input type="number" id="modal-qty-input" value="${state.selectedProduct.selectedQuantity}" min="1" 
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0046: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1230
+  Evidence: <option value="${st}" ${params.status === st ? 'selected' : ''}>${translateOrderStatus(st)}</option>
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0047: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1709
+  Evidence: const res = await apiFetch(`/api/admin/products/${productId}`, { method: 'DELETE' });
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[91mCRITICAL[0m] OWASP-0048: SQL template injection
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1855
+  Evidence: const res = await apiFetch(`/api/admin/coupons/${id}`, { method: 'DELETE' });
+  Issue: Template literals in SQL queries allow injection
+  Fix: Use parameterized queries with placeholders
+
+[[93mHIGH[0m] OWASP-0001: Short password constant
+  Category: A07:Authentication Failures
+  Location: /home/user/mantomoda/src/server/middlewares/admin-audit.js:34
+  Evidence: const REDACTED_KEYS = ['password', 'token', 'apiKey', 'authorization', 'secret'];
+  Issue: Hardcoded short password is insecure
+  Fix: Remove hardcoded passwords, use secrets management
+
+[[93mHIGH[0m] OWASP-0005: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:105
+  Evidence: toast.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0006: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:252
+  Evidence: container.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0007: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:321
+  Evidence: container.innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0008: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:325
+  Evidence: container.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0009: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:347
+  Evidence: grid.innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0010: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:356
+  Evidence: grid.innerHTML = state.products.map(product => {
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0011: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:475
+  Evidence: content.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0012: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:709
+  Evidence: list.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0013: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:715
+  Evidence: if (notices) notices.innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0014: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:729
+  Evidence: list.innerHTML = data.items.map(item => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0015: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:759
+  Evidence: notices.innerHTML = data.wholesaleNotices.map(n => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0016: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:765
+  Evidence: notices.innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0017: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:952
+  Evidence: container.innerHTML = html;
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0018: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:970
+  Evidence: container.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0019: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:979
+  Evidence: container.innerHTML = res.data.map(order => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0020: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1058
+  Evidence: statusCard.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0021: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1070
+  Evidence: statusCard.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0022: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1082
+  Evidence: statusCard.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0023: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1164
+  Evidence: container.innerHTML = '<p class="text-xs text-slate-400 py-6 text-center">هیچ درخواستی ثبت نشده است.
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0024: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1168
+  Evidence: container.innerHTML = res.data.map(app => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0025: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1220
+  Evidence: controls.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0026: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1245
+  Evidence: container.innerHTML = res.data.map(order => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0027: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1340
+  Evidence: filterBar.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0028: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1359
+  Evidence: container.innerHTML = '<p class="text-xs text-slate-400">محصولی در این فهرست نیست.</p>';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0029: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1363
+  Evidence: container.innerHTML = visible.map(p => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0030: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1550
+  Evidence: container.innerHTML = cards.map(c => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0031: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1561
+  Evidence: top.innerHTML = (d.topProducts || []).length
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0032: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1572
+  Evidence: low.innerHTML = (d.lowStock || []).length
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0033: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1599
+  Evidence: document.getElementById('pf-variants').innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0034: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1613
+  Evidence: if (list) list.innerHTML = state.categories.map(c => `<option value="${escapeAttr(c.name)}"></option
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0035: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1622
+  Evidence: row.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0036: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1661
+  Evidence: variants.innerHTML = '';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0037: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1745
+  Evidence: container.innerHTML = '<p class="text-emerald-600 font-bold text-xs">با این آستانه، موجودی هیچ قلمی 
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0038: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1749
+  Evidence: container.innerHTML = res.data.map(item => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0039: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1815
+  Evidence: container.innerHTML = '<p class="text-slate-400 text-xs">هنوز کد تخفیفی ساخته نشده است.</p>';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0040: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1819
+  Evidence: container.innerHTML = res.data.map(c => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0041: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1875
+  Evidence: container.innerHTML = `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0042: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1951
+  Evidence: container.innerHTML = '<p class="text-slate-400">هنوز اقدام ثبت‌شده‌ای وجود ندارد.</p>';
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[93mHIGH[0m] OWASP-0043: innerHTML assignment
+  Category: A03:Injection
+  Location: /home/user/mantomoda/src/client/public/app.js:1955
+  Evidence: container.innerHTML = res.data.map(a => `
+  Issue: innerHTML can execute scripts in user content
+  Fix: Use textContent for text, sanitize HTML with DOMPurify
+
+[[90mLOW[0m] OWASP-0002: Non-production check
+  Category: A05:Security Misconfiguration
+  Location: /home/user/mantomoda/src/server/services/otp.service.js:43
+  Evidence: return providerName === 'mock' && process.env.NODE_ENV !== 'production';
+  Issue: Ensure production settings in deployment
+  Fix: Use environment-specific configuration

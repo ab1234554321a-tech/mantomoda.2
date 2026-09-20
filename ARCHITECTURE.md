@@ -347,3 +347,48 @@ expiry), dashboard accuracy, the audit trail, settings propagation and archive s
 | `scripts/server-install.sh` | One idempotent command: Docker, service user, `.env` with generated secret, build, start, Nginx + certificate, nightly backup, preflight |
 | `scripts/preflight.sh` | Launch-readiness audit; blocks the mistakes that actually destroy a first launch |
 | `HOSTING-GUIDE.md` | Plain-language Persian runbook: what hosting is, recommended server, costs, step-by-step, 10-point post-launch checklist, day-to-day commands, troubleshooting table |
+
+---
+
+## 15. Security Boundaries: Output Encoding & the Skills Toolchain (added 2026-09-20 — ADR-022, ADR-023)
+
+### 15.1 One rule for human-typed text
+
+| Data | Where it is typed | Where it is rendered | How it is rendered |
+|---|---|---|---|
+| Product title, description, material, category, SKU, season, variant colour/size | Admin panel | Storefront cards, product page, admin product table, toasts | `escapeHtml()` / `escapeAttr()` — never raw interpolation |
+| Wholesale application (company name, address, phone, city, economic code) | **Customer** | **Admin panel** wholesale queue | `escapeHtml()` (this was the exploitable path — ADR-022) |
+| Registration name / e-mail, delivery address, recipient name | **Customer** | Admin order list, customer order view, printable invoice | `escapeHtml()` in the SPA; the server's invoice template encodes independently |
+| Shop identity (name, address, phone, tax id, invoice note) | Admin settings | Printable invoice, page metadata | Server-side `escapeHtml()` in `invoice.routes.js` / `seo.routes.js` |
+
+Rules that follow from the table:
+
+1. Human-typed text reaches HTML **only** through the encoder; `textContent`/`value` is preferred where
+   the markup allows, because it is safe by construction.
+2. The encoder lives once per surface (one in the SPA, one per server template) — duplicated copies of
+   an encoding function are how one of them silently drifts.
+3. `tests/escaping.test.js` (Level 9) is the enforcement point: encoder behaviour, a wiring check over
+   every risky interpolation in the shipped client, and real HTTP requests against the pre-rendered
+   product page and the printable invoice. It is mutation-tested — removing a single `escapeHtml()`
+   call makes it fail.
+
+### 15.2 The skills toolchain as a gate (advisory, not authoritative)
+
+```
+scripts/skills-audit.sh  (npm run skills-audit)
+  ├── security-auditor/owasp-check.py      → pattern candidates (A02/A03/A05/A07)
+  ├── security-auditor/detect-secrets.sh   → leaked credentials (vendored skills, node_modules excluded)
+  ├── technical-writer/validate-docs.sh    → documentation + ADR coverage
+  ├── npm test / npm run a11y / npm audit  → the project's own gates
+  └── scripts/preflight.sh                 → environment readiness
+        ↓
+  reports/skills-audit-<stamp>.md (+ raw .txt evidence)
+        ↓
+  human triage  →  real defect? → fix + promote to a test (that test gates CI)
+                →  false positive? → recorded as such in the report
+```
+
+The scanners never block a release by themselves (CI runs them with `continue-on-error` and publishes
+the report as an artifact). This is deliberate: the first audit produced 7 "CRITICAL" findings in a
+codebase with no SQL and one genuinely exploitable chain out of 39 `innerHTML` warnings. Automation
+narrows the search; the blocker is always a test.

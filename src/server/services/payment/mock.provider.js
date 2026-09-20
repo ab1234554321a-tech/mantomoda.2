@@ -89,7 +89,7 @@ export const mockPaymentProvider = {
     return {
       ok: true,
       alreadyVerified,
-      refId: String(Math.floor(100000000 + Math.random() * 899999999)),
+      refId: String(crypto.randomInt(100000000, 999999999)),
       cardPan: '6037-****-****-1234',
       provider: 'mock',
       raw: { authority, amount: amountRial }

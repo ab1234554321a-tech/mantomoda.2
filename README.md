@@ -154,3 +154,47 @@ the payment callback points at localhost, the data directory is unwritable, or n
 
 **Note:** GitHub (or the zip) is a *backup of the code* — it does not put the shop online. Hosting is
 what makes customers able to buy; see `HOSTING-GUIDE.md`.
+
+---
+
+## 12. The Skills Toolchain — What It Actually Does (ADR-023)
+
+69 Claude skills are vendored in [`.claude/skills/`](.claude/skills) and mapped to project phases in
+[`SKILLS.md`](SKILLS.md). They are not documentation: their own scanners run against `src/` and their
+findings have already changed the code.
+
+```bash
+npm run skills-audit        # or: bash scripts/skills-audit.sh
+```
+
+One command runs the `security-auditor` OWASP pattern scanner and secret scanner, the
+`technical-writer` documentation/ADR coverage check, and the project's own gates (tests,
+accessibility, dependency audit, environment preflight). It prints a per-check verdict and writes a
+timestamped report to `reports/skills-audit-<stamp>.md`.
+
+### What the skills have found so far
+
+| Finding | Where it came from | What changed |
+|---|---|---|
+| **Back-office XSS**: customer-typed wholesale fields (company name, address, phone, city, economic code) and registration name/e-mail were rendered into the *admin panel* without encoding — a crafted application ran script inside the owner's session and could read every customer's delivery data | `security-auditor` flagged the client's `innerHTML` usage; the exploitable paths were confirmed by hand | One encoder for all 36 human-entered interpolations + **Level 9** regression suite (`tests/escaping.test.js`), mutation-tested (ADR-022) |
+| **Order-number collisions**: numbers had only 9,000 possible values and invoices are looked up *by number*, so a customer could eventually open someone else's invoice | `security-auditor` OWASP A02 on `Math.random()` | Persisted monotonic sequence with a random start; `crypto` for all identity fields; uniqueness asserted over 300 orders |
+
+### How to read a skill report
+
+Scanners produce **candidates, not verdicts**. On the first run this project's report contained 7
+"CRITICAL" SQL-injection findings — in a codebase that contains no SQL at all (the store is a JSON
+snapshot, ADR-010) — and 39 `innerHTML` warnings, of which exactly one chain was genuinely
+exploitable. The rule is therefore: run the scanner, read the report, verify by hand, fix what is
+real, and record what is not. Anything proven real gets promoted into a real test, and only tests
+gate a release. That is why the audit is advisory and CI stays authoritative.
+
+### Publishing the code
+
+```bash
+GITHUB_TOKEN=ghp_xxx bash scripts/push-to-github.sh
+```
+
+Pushes the current commit to the GitHub remote and prints the local and remote HEAD as proof. A token
+is required because GitHub will not accept an upload without one — it is the only step in this
+project that cannot be automated away, and it is a one-time copy-paste. GitHub is a *code backup*; the
+shop itself goes online with `scripts/server-install.sh` (section 11).

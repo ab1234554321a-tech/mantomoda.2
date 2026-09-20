@@ -487,5 +487,39 @@ export async function runCommerceTests() {
   assert.ok(slugify('').length > 0, 'An empty title still yields a usable slug');
   log('Slug generation handles Persian, Latin and empty input');
 
+
+  // ---------------------------------------------------------------------------
+  // 12. Order numbers must be unique — an OWASP-skill finding that became a test
+  // ---------------------------------------------------------------------------
+  // Found by running `.claude/skills/security-auditor/scripts/owasp-check.py`
+  // against this codebase: the old generator used Math.random() over 9000 values,
+  // so two orders collided after roughly 110 orders — and the invoice route looks
+  // orders up BY NUMBER, which would hand one customer another's invoice.
+  const numberOrders = [];
+  for (let i = 0; i < 40; i += 1) {
+    const created = await request(app)
+      .post('/api/orders')
+      .set(auth(retailToken))
+      .send({ items: [{ productId: 'prod-002', variantId: 'var-002-1', quantity: 1 }], shippingAddress });
+    if (created.status === 201) numberOrders.push(created.body.data.orderNumber);
+  }
+
+  assert.ok(numberOrders.length >= 10, 'Enough orders were created to test number uniqueness');
+  assert.strictEqual(new Set(numberOrders).size, numberOrders.length, 'Every order number is unique');
+
+  const formatOk = numberOrders.every(n => /^MM-ORD-\d{4}-\d{5,6}$/.test(n));
+  assert.ok(formatOk, 'Order numbers keep the human-friendly MM-ORD-YYYY-NNNNN format');
+
+  const sequenceIncreasing = numberOrders
+    .map(n => Number(n.split('-').pop()))
+    .every((value, index, all) => index === 0 || value > all[index - 1]);
+  assert.ok(sequenceIncreasing, 'Order numbers increase monotonically (no gaps caused by retries/collisions)');
+  log(`Order numbers are unique and sequential (${numberOrders.length} orders, ${numberOrders[0]} → ${numberOrders.at(-1)})`);
+
+  // The invoice lookup by number must resolve to exactly one order.
+  const byNumber = db.listOrders().filter(o => o.orderNumber === numberOrders[0]);
+  assert.strictEqual(byNumber.length, 1, 'An order number identifies exactly one order');
+  log('Invoice lookup by order number is unambiguous');
+
   log('Commerce suite complete');
 }

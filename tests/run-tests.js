@@ -12,6 +12,7 @@ const { runPaymentTests } = await import('./payment.test.js');
 const { runOtpTests } = await import('./otp.test.js');
 const { runOperationsTests } = await import('./operations.test.js');
 const { runCommerceTests } = await import('./commerce.test.js');
+const { runEscapingTests } = await import('./escaping.test.js');
 
 async function main() {
   console.log('========================================================');
@@ -46,6 +47,9 @@ async function main() {
     await runCommerceTests();
     passedCount++;
 
+    await runEscapingTests();
+    passedCount++;
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log('\n========================================================');
     console.log(`🎉 ALL ${passedCount} TEST SUITES PASSED SUCCESSFULLY! (${duration}s)`);
@@ -57,6 +61,7 @@ async function main() {
     console.log('✔ Level 6: OTP / SMS Mobile Verification (BL-007): PASSED');
     console.log('✔ Level 7: Operations — inventory, order lifecycle, notifications, SEO, uploads: PASSED');
     console.log('✔ Level 8: Commerce — pricing, coupons, catalog, invoices, audit log: PASSED');
+    console.log('✔ Level 9: Output encoding — storefront, invoice, back-office XSS (ADR-022): PASSED');
     console.log('========================================================\n');
     process.exit(0);
   } catch (error) {

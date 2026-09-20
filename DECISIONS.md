@@ -394,3 +394,60 @@ This log contains the record of all major architectural and technical decisions 
   incident is prevented by configuration rather than by memory. Ceiling: a single-server deployment —
   horizontal scaling would require moving the store to a real database (`TD-006`) and object storage
   for uploads (`TD-007`).
+
+---
+
+## ADR-022: Output Encoding as a Hard Boundary (back-office XSS)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: An automated OWASP scan run by the vendored `security-auditor` skill flagged 39
+  `innerHTML` assignments in the storefront SPA. Most were benign, but following the flag by hand
+  found a genuine chain: the wholesale application form (customer input: `companyName`,
+  `businessAddress`, `businessPhone`, `city`, `economicCode`) and registration data (`userFullName`,
+  `userEmail`) were interpolated into the **admin panel's** HTML without encoding, as was the
+  delivery address on the customer's own order page. So any customer could store markup that executes
+  in the owner's browser the next time she opens the wholesale queue. The owner's token lives in
+  memory, which limits token theft, but the injected script runs inside the admin session and can
+  read every customer's name, phone and address and drive any admin endpoint. For a shop that stores
+  its customers' delivery details, that is a data breach, not a cosmetic bug.
+- **Decision**:
+  - One encoder (`escapeAttr` + `escapeHtml` alias in `src/client/public/app.js`) is the only way
+    human-typed text may reach HTML, in both text and attribute positions.
+  - Every one of the 36 interpolations that carry human-entered text is wrapped — storefront product
+    copy, the invoice/order views, toasts that quote product names, and every back-office list.
+  - `textContent`/`value` assignments are preferred where the markup allows, because they are safe by
+    construction.
+  - A **Level 9 test suite** (`tests/escaping.test.js`) guards both behaviour and wiring: it runs
+    hostile payloads (`<img src=x onerror=…>`, quote breakouts, `</textarea>`) through the real
+    encoder, asserts every risky interpolation in the shipped client is wrapped, and drives real HTTP
+    requests to prove the **server-rendered** product page and printable invoice emit the payload as
+    text. Reverting any single fix makes the suite fail (verified by mutation).
+- **Consequences**: Customer-supplied text can no longer become code in anyone's browser, and a future
+  edit that drops an encoder fails CI instead of being discovered by an attacker. The scan's other
+  findings were rejected as false positives (the project contains no SQL at all — the store is a JSON
+  snapshot per ADR-010), which is the working rule: skills surface candidates, a human-grade review
+  decides.
+
+---
+
+## ADR-023: Skills Are Wired Into the Build, Not Installed Beside It
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: 69 Claude skills were vendored into `.claude/skills` with a mapping document, but none
+  of them ran as part of the work, so they changed nothing. Meanwhile the two most valuable defects of
+  this phase (order-number collisions and the stored XSS above) were both found by actually executing
+  the skills' own scanners against `src/`.
+- **Decision**:
+  - `scripts/skills-audit.sh` executes the vendored scanners for real — `security-auditor`
+    (OWASP patterns + secret scan) and `technical-writer` (documentation/ADR coverage) — plus the
+    project's own gates (`npm test`, accessibility audit, dependency audit, `scripts/preflight.sh`) —
+    and writes a timestamped report to `reports/skills-audit-<stamp>.md` with per-check verdicts.
+  - Findings are **triaged, not obeyed**: the script reports and the report is read; a scanner's
+    "critical" that contradicts the architecture (e.g. SQL injection in a project with no SQL) is
+    recorded as a false positive rather than "fixed".
+  - Scans exclude vendored skills and `node_modules` so the tool never grades its own source.
+  - The audit is advisory and therefore **not** a CI gate; anything it proves reproducible is promoted
+    into a real test (see ADR-022's Level 9 suite), and that promotion is the only path to blocking.
+- **Consequences**: The skills toolchain produces evidence on every run instead of being decoration,
+  the owner can re-run the whole audit with one command (`npm run skills-audit`), and the gate stays
+  honest because automated-but-unvetted scanners can never block a release on their own.

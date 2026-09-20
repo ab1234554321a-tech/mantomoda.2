@@ -1,6 +1,7 @@
 // In-Memory Relational Store with ACID-like consistency for Manto Moda
 // Backed by a file snapshot (ADR-010). The public interface is unchanged:
 // swapping this for PostgreSQL/Prisma later is a data-layer-only change.
+import crypto from 'crypto';
 import { SEED_USERS, SEED_APPLICATIONS, SEED_CATEGORIES, SEED_PRODUCTS, SEED_ORDERS } from './seed-data.js';
 import { loadSnapshot, createSaver, isPersistenceEnabled, snapshotPath } from './persistence.js';
 
@@ -108,6 +109,8 @@ class DataStore {
       this.payments = snapshot.payments || [];
       this.otps = snapshot.otps || [];
       this.settings = mergeSettings(DEFAULT_SETTINGS, snapshot.settings || {});
+      // Monotonic counter that makes order numbers unique (see nextOrderNumber).
+      this.orderSequence = Number(snapshot.orderSequence || 0);
       this.coupons = snapshot.coupons || [];
       this.adminActions = snapshot.adminActions || [];
       this.loadedFromSnapshot = true;
@@ -120,6 +123,7 @@ class DataStore {
       this.payments = [];
       this.otps = [];
       this.settings = clone(DEFAULT_SETTINGS);
+      this.orderSequence = 0;
       this.coupons = [];
       this.adminActions = [];
       this.loadedFromSnapshot = false;
@@ -145,7 +149,8 @@ class DataStore {
       otps: this.otps,
       settings: this.settings,
       coupons: this.coupons,
-      adminActions: this.adminActions
+      adminActions: this.adminActions,
+      orderSequence: this.orderSequence
     };
   }
 
@@ -197,7 +202,7 @@ class DataStore {
   createCoupon(data) {
     const now = new Date().toISOString();
     const coupon = {
-      id: `cpn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `cpn-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`,
       code: String(data.code).trim().toUpperCase(),
       type: data.type,                       // PERCENT | FIXED
       value: Number(data.value),
@@ -266,7 +271,7 @@ class DataStore {
   // --- Admin audit log (ADR-020) ---
   recordAdminAction({ adminId, adminEmail, action, entity, entityId, details, ip }) {
     const entry = {
-      id: `act-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `act-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`,
       at: new Date().toISOString(),
       adminId: adminId || null,
       adminEmail: adminEmail || null,
@@ -466,7 +471,7 @@ class DataStore {
 
   createUser(userData) {
     const newUser = {
-      id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `usr-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
       email: userData.email,
       phone: userData.phone,
       fullName: userData.fullName,
@@ -705,7 +710,7 @@ class DataStore {
   createProduct(product) {
     const now = new Date().toISOString();
     const newProduct = {
-      id: product.id || `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      id: product.id || `prod-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`,
       sku: product.sku,
       slug: product.slug,
       title: product.title,
@@ -938,11 +943,42 @@ class DataStore {
     return this.orders.filter(o => o.userId === userId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
+  /**
+   * Unique, human-friendly order number.
+   *
+   * Why this replaced the old pseudo-random formula: that gave only 9000 possible
+   * numbers per year, so by the birthday paradox two orders collided after ~110
+   * orders — and the invoice route looks an order up *by number*, so a collision
+   * means one customer could receive another customer's invoice.
+   *
+   * Now: a persisted monotonic counter (never repeats), starting from a random
+   * point so a brand-new shop's first order is not obviously "00001", and padded
+   * to five digits. Structural uniqueness, not statistical luck.
+   */
+  nextOrderNumber() {
+    const year = new Date().getFullYear();
+    const taken = new Set(this.orders.map(o => o.orderNumber));
+
+    // First ever order of this shop: start somewhere unpredictable but fixed.
+    if (!this.orderSequence) {
+      this.orderSequence = crypto.randomInt(1000, 8000);
+    }
+
+    for (let attempt = 0; attempt < 100000; attempt += 1) {
+      this.orderSequence += 1;
+      const candidate = `MM-ORD-${year}-${String(this.orderSequence).padStart(5, '0')}`;
+      if (!taken.has(candidate)) return candidate;
+    }
+
+    // Unreachable in practice; kept so the function can never loop forever.
+    return `MM-ORD-${year}-${crypto.randomInt(100000, 999999)}`;
+  }
+
   createOrder(orderData) {
     const now = new Date().toISOString();
     const newOrder = {
       id: `ord-${Date.now().toString().slice(-4)}`,
-      orderNumber: `MM-ORD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      orderNumber: this.nextOrderNumber(),
       userId: orderData.userId,
       userFullName: orderData.userFullName,
       userEmail: orderData.userEmail,

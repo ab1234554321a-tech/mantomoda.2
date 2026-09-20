@@ -1,11 +1,11 @@
 {
   "projectName": "Manto Moda",
-  "version": "0.3.0-rc1",
+  "version": "0.4.0-rc1",
   "lastUpdated": "2026-09-20",
   "activeBranch": "main",
-  "currentPhase": "Phase 10 — Back-Office & Commerce (COMPLETE)",
-  "overallProgressPercent": 98,
-  "healthScore": 94,
+  "currentPhase": "Phase 12 — Security Hardening from the Skills Audit (COMPLETE)",
+  "overallProgressPercent": 99,
+  "healthScore": 96,
   "completed": [
     "Git repository initialization & Source of Truth governance",
     "Master Roadmap (ROADMAP.md) and 12-Agent Ecosystem (agents/01 to agents/12)",
@@ -55,7 +55,9 @@
     "Phase 10: Admin dashboard with recognised revenue, best sellers and critical stock",
     "Phase 10: Admin audit trail — who changed what, when, from where (ADR-020)",
     "Phase 10: Admin panel UI — 7 tabs, product form, inventory quick-edit, coupon manager, settings editor",
-    "Phase 10: Test suite Level 8 (commerce) — 8 suites green"
+    "Phase 10: Test suite Level 8 (commerce) — 8 suites green",
+    "Phase 11 — Deployment & Release (ADR-021): production Dockerfile + compose (data volume, backup sidecar), Nginx/HTTPS config, systemd unit, one-command Ubuntu installer, pre-launch environment audit (preflight), Persian hosting runbook",
+    "Phase 12 — Security hardening from the skills audit (ADR-022, ADR-023): fixed a stored XSS that let any customer run script inside the admin panel, fixed order-number collisions that could expose another customer's invoice, added a Level 9 output-encoding suite (mutation-tested) and scripts/skills-audit.sh which runs the vendored skill scanners as part of the project gates"
   ],
   "inProgress": [],
   "blocked": [],

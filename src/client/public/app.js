@@ -69,6 +69,20 @@ async function apiFetch(url, options = {}) {
  * Product titles come from the admin panel and end up in attributes (alt,
  * aria-label), so an unescaped quote would break the markup.
  */
+/**
+ * Escapes a value for HTML text content. Text nodes and attribute values need
+ * the same five-character set here, so this is an alias of escapeAttr() with a
+ * name that reads correctly at text call sites.
+ *
+ * Why it matters: product copy is typed by the admin while business details are
+ * typed by customers, and both are rendered inside the back-office panel. An
+ * unescaped value is therefore script running in the admin's browser, not just
+ * broken markup (ADR-022).
+ */
+function escapeHtml(value = '') {
+  return escapeAttr(value);
+}
+
 function escapeAttr(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -90,7 +104,7 @@ function showToast(message, type = 'info') {
   toast.className = `${bgClass} text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 transition transform translate-y-2 pointer-events-auto border border-white/10`;
   toast.innerHTML = `
     <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
-    <span>${message}</span>
+    <span>${escapeHtml(message)}</span>
   `;
 
   container.appendChild(toast);
@@ -350,7 +364,7 @@ function renderProductsGrid() {
           <img src="${product.images[0]}" alt="${escapeAttr(product.title)}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
           <div class="absolute top-3 right-3 flex flex-col gap-1.5">
             ${product.isFeatured ? `<span class="bg-brand-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">پیشنهاد ویژه</span>` : ''}
-            <span class="bg-slate-900/80 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">${product.season}</span>
+            <span class="bg-slate-900/80 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">${escapeHtml(product.season)}</span>
           </div>
           ${hasWholesalePrice ? `
             <div class="absolute bottom-3 left-3 right-3 bg-amber-500/95 backdrop-blur text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-lg flex items-center justify-between">
@@ -364,18 +378,18 @@ function renderProductsGrid() {
         <div class="p-5 flex-grow flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-              <span>${product.category}</span>
-              <span class="font-mono text-[11px]">${product.sku}</span>
+              <span>${escapeHtml(product.category)}</span>
+              <span class="font-mono text-[11px]">${escapeHtml(product.sku)}</span>
             </div>
             <h3 class="font-bold text-slate-900 text-sm leading-snug mb-2">
               <a href="/product/${encodeURIComponent(product.slug || product.id)}"
                  data-product-link="${product.id}"
                  onclick="return handleProductLink(event, '${product.id}')"
                  class="hover:text-brand-600 transition-colors">
-                ${product.title}
+                ${escapeHtml(product.title)}
               </a>
             </h3>
-            <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${product.material}</p>
+            <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${escapeHtml(product.material)}</p>
           </div>
 
           <div>
@@ -478,10 +492,10 @@ function renderModalContent() {
       <!-- DETAILS & VARIANT SELECTOR -->
       <div class="flex flex-col justify-between">
         <div>
-          <span class="text-xs text-brand-600 font-bold bg-brand-50 px-2 py-0.5 rounded">${p.category}</span>
-          <h2 class="text-lg font-black text-slate-900 mt-2 mb-1">${p.title}</h2>
-          <div class="text-xs text-slate-500 mb-4 font-mono">کد محصول: ${p.sku} | جنس: ${p.material}</div>
-          <p class="text-xs text-slate-600 leading-relaxed mb-4">${p.description}</p>
+          <span class="text-xs text-brand-600 font-bold bg-brand-50 px-2 py-0.5 rounded">${escapeHtml(p.category)}</span>
+          <h2 class="text-lg font-black text-slate-900 mt-2 mb-1">${escapeHtml(p.title)}</h2>
+          <div class="text-xs text-slate-500 mb-4 font-mono">کد محصول: ${escapeHtml(p.sku)} | جنس: ${escapeHtml(p.material)}</div>
+          <p class="text-xs text-slate-600 leading-relaxed mb-4">${escapeHtml(p.description)}</p>
 
           <!-- COLOR VARIANTS -->
           <div class="mb-4">
@@ -489,8 +503,8 @@ function renderModalContent() {
             <div class="flex flex-wrap gap-2">
               ${p.variants.map(v => `
                 <button onclick="selectVariant('${v.id}')" class="px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition ${state.selectedProduct.selectedVariant?.id === v.id ? 'border-brand-600 bg-brand-50 text-brand-700 font-bold ring-1 ring-brand-500' : 'border-slate-200 bg-white text-slate-700'}">
-                  <span class="w-3 h-3 rounded-full border border-black/20" style="background-color: ${v.colorHex || '#000'}"></span>
-                  <span>${v.color} (سایز ${v.size})</span>
+                  <span class="w-3 h-3 rounded-full border border-black/20" style="background-color: ${escapeAttr(v.colorHex || '#000')}"></span>
+                  <span>${escapeHtml(v.color)} (سایز ${escapeHtml(v.size)})</span>
                 </button>
               `).join('')}
             </div>
@@ -988,7 +1002,7 @@ async function fetchOrders() {
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-          <span class="text-slate-500">نشانی تحویل: ${order.shippingAddress?.city}، ${order.shippingAddress?.fullAddress}</span>
+          <span class="text-slate-500">نشانی تحویل: ${escapeHtml(order.shippingAddress?.city)}، ${escapeHtml(order.shippingAddress?.fullAddress)}</span>
           <div class="text-right">
             <span class="text-slate-400 text-[11px] block">مبلغ پرداختی:</span>
             <span class="text-sm font-black text-brand-700 font-mono">${formatPrice(order.payableAmount)}</span>
@@ -1058,7 +1072,7 @@ async function checkWholesaleStatus() {
           <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg">⏳</div>
           <div>
             <h4 class="font-bold text-sm">درخواست شما در دست بررسی کارشناسان مدا است</h4>
-            <p class="text-xs text-amber-700 mt-0.5">اطلاعات کسب‌وکار (${app.companyName}) با موفقیت ثبت شد. تایید مدارک معمولاً ظرف ۲۴ ساعت کاری انجام می‌شود.</p>
+            <p class="text-xs text-amber-700 mt-0.5">اطلاعات کسب‌وکار (${escapeHtml(app.companyName)}) با موفقیت ثبت شد. تایید مدارک معمولاً ظرف ۲۴ ساعت کاری انجام می‌شود.</p>
           </div>
         </div>
       `;
@@ -1070,7 +1084,7 @@ async function checkWholesaleStatus() {
           <div class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold text-lg">✕</div>
           <div>
             <h4 class="font-bold text-sm">درخواست همکاری عمده تایید نگردید</h4>
-            <p class="text-xs text-rose-700 mt-0.5">${app.adminNotes || 'مدارک ارائه‌شده ناقص می‌باشد. می‌توانید مجدداً اقدام نمایید.'}</p>
+            <p class="text-xs text-rose-700 mt-0.5">${escapeHtml(app.adminNotes || 'مدارک ارائه‌شده ناقص می‌باشد. می‌توانید مجدداً اقدام نمایید.')}</p>
           </div>
         </div>
       `;
@@ -1155,14 +1169,14 @@ async function loadAdminWholesale() {
       <div class="p-5 rounded-2xl border ${app.status === 'PENDING' ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-slate-50'} space-y-3">
         <div class="flex flex-wrap justify-between items-center gap-2">
           <div>
-            <h4 class="font-bold text-sm text-slate-900">${app.companyName} <span class="text-xs text-slate-500">(${app.userFullName})</span></h4>
-            <div class="text-xs text-slate-500 mt-0.5">شهر: ${app.city} | تلفن: ${app.businessPhone} | شناسه اقتصادی: ${app.economicCode || 'ندارد'}</div>
+            <h4 class="font-bold text-sm text-slate-900">${escapeHtml(app.companyName)} <span class="text-xs text-slate-500">(${escapeHtml(app.userFullName)})</span></h4>
+            <div class="text-xs text-slate-500 mt-0.5">شهر: ${escapeHtml(app.city)} | تلفن: ${escapeHtml(app.businessPhone)} | شناسه اقتصادی: ${escapeHtml(app.economicCode || 'ندارد')}</div>
           </div>
           <span class="px-2.5 py-1 rounded-full text-xs font-bold ${app.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : app.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}">
             ${app.status === 'APPROVED' ? 'تایید شده' : app.status === 'PENDING' ? 'در انتظار بررسی' : 'رد شده'}
           </span>
         </div>
-        <p class="text-xs text-slate-600">آدرس: ${app.businessAddress}</p>
+        <p class="text-xs text-slate-600">آدرس: ${escapeHtml(app.businessAddress)}</p>
 
         ${app.status === 'PENDING' ? `
           <div class="pt-2 border-t border-amber-200/60 flex items-center justify-end gap-2">
@@ -1233,7 +1247,7 @@ async function loadAdminOrders(params = {}) {
         <div class="flex flex-wrap justify-between items-center gap-2">
           <div>
             <span class="font-mono text-xs font-bold text-slate-800">${order.orderNumber}</span>
-            <div class="text-xs text-slate-600 mt-0.5">مشتری: ${order.userFullName} (${order.userEmail})</div>
+            <div class="text-xs text-slate-600 mt-0.5">مشتری: ${escapeHtml(order.userFullName)} (${escapeHtml(order.userEmail)})</div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${getOrderStatusBadge(order.status)}">
@@ -1252,7 +1266,7 @@ async function loadAdminOrders(params = {}) {
         </div>
 
         <div class="text-xs text-slate-600">
-          اقلام: ${order.items.map(i => `${i.productTitle} (${i.quantity} عدد)`).join('، ')}
+          اقلام: ${order.items.map(i => `${escapeHtml(i.productTitle)} (${i.quantity} عدد)`).join('، ')}
         </div>
 
         <div class="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-100 text-xs">
@@ -1355,7 +1369,7 @@ async function loadAdminProducts() {
               ${escapeAttr(p.title)}
               ${p.isArchived ? '<span class="text-[10px] font-bold text-rose-600 mr-1">(آرشیو شده)</span>' : ''}
             </h4>
-            <div class="text-[11px] text-slate-500 font-mono">${p.sku} | ${p.category}</div>
+            <div class="text-[11px] text-slate-500 font-mono">${escapeHtml(p.sku)} | ${escapeHtml(p.category)}</div>
           </div>
         </div>
         <div class="flex items-center gap-6 text-xs">
