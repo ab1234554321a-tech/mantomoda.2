@@ -1888,7 +1888,7 @@ paths:
   /api/admin/orders/{id}/status:
     put:
       tags: [Admin]
-      summary: Advance the order state machine. Illegal jumps (e.g. DELIVERED → PENDING) are refused
+      summary: "Advance the order state machine. Only legal transitions are accepted: PENDING→CONFIRMED/CANCELLED, CONFIRMED→PROCESSING/CANCELLED, PROCESSING→SHIPPED/CANCELLED, SHIPPED→DELIVERED. An illegal jump (for example DELIVERED→PENDING) is 409 with a machine code, not a silent success (ADR-011)."
       parameters:
         - name: id
           in: path
@@ -1905,19 +1905,25 @@ paths:
               $ref: '#/components/schemas/OrderStatusUpdate'
       responses:
         '200':
-          description: Success
+          description: The order in its new state
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiMessage'
+                $ref: '#/components/schemas/OrderEnvelope'
         '400':
-          description: Validation failed
+          description: Malformed body (unknown status value)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Not found
+          description: No such order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: "Illegal transition for the current state (code INVALID_TRANSITION)"
           content:
             application/json:
               schema:

@@ -201,6 +201,17 @@ The contract is **verified against the running code**, not maintained by hand:
 npm run api:check
 ```
 
+To walk the whole shop end to end — catalogue, cart, order, mock payment, invoice, back office,
+state machine, CSV, ownership check and the editorial pages — on a real HTTP server:
+
+```bash
+npm run verify:golden
+```
+
+It prints one line per step, so "the shop works" is an observation rather than a claim. It is also what
+caught two wrong assumptions in the API contract (the cart's field names and the 409 on an illegal
+order transition).
+
 The check derives the real surface from `app.js` (mount points) and the router files, compares it with
 the spec in both directions, and fails when a route exists in the code but not in the spec, or the spec
 documents a route the app no longer serves. It runs in CI and in `npm run skills-audit`. This is
