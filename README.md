@@ -166,7 +166,31 @@ what makes customers able to buy; see `HOSTING-GUIDE.md`.
 
 ---
 
-## 12. API Contract (openapi.yaml)
+## 12. Editorial Pages (terms, returns, privacy, sizing, contact)
+
+Five server-rendered pages at `/page/<slug>`, rendered from
+[`src/server/content/pages.js`](src/server/content/pages.js):
+
+| Page | Why it exists |
+|---|---|
+| `/page/terms` | Order, payment and shipping rules |
+| `/page/returns` | Return window and refund steps — a payment gateway will not approve a merchant without it |
+| `/page/privacy` | What is stored, who can read it, how to have it deleted |
+| `/page/sizing` | Size table and fit guidance (the most common pre-sale question) |
+| `/page/contact` | Support phone and address, taken from **settings** — identical to the invoice |
+
+They are plain HTML with their own `<title>`, meta description and canonical URL, listed in
+`sitemap.xml`, and linked from the storefront footer. Statements that are a business promise (return
+window, refund timing, opening hours) are drafted with sensible defaults and marked `TODO-OWNER` in
+the content file: the marker never reaches the customer, and `npm run preflight` reports how many are
+still unconfirmed, so a default policy cannot go live silently.
+
+To edit the text, open `src/server/content/pages.js`, change the strings and remove the `TODO-OWNER`
+prefix from anything you have confirmed. No build step.
+
+---
+
+## 13. API Contract (openapi.yaml)
 
 The 49 endpoints the application serves are described in [`openapi.yaml`](openapi.yaml) — request
 bodies, response envelopes, roles, rate limits and the demo-mode exception.
@@ -185,7 +209,7 @@ application, so the contract is only useful if it is *true*.
 
 ---
 
-## 13. The Skills Toolchain — What It Actually Does (ADR-023)
+## 14. The Skills Toolchain — What It Actually Does (ADR-023)
 
 69 Claude skills are vendored in [`.claude/skills/`](.claude/skills) and mapped to project phases in
 [`SKILLS.md`](SKILLS.md). They are not documentation: their own scanners run against `src/` and their

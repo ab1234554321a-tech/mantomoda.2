@@ -13,6 +13,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { db } from '../db/store.js';
+import { pageList } from './pages.routes.js';
 import { publicPath } from '../paths.js';
 
 const router = Router();
@@ -84,6 +85,11 @@ router.get('/sitemap.xml', (req, res) => {
       changefreq: 'weekly'
     }))
   ];
+  // The editorial pages are part of the public site, so they belong in the
+  // sitemap for the same reason the products do (ADR-025).
+  for (const page of pageList()) {
+    urls.push({ loc: `${siteUrl(req)}${page.url}`, changefreq: 'monthly', priority: '0.4' });
+  }
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

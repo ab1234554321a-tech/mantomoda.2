@@ -6,6 +6,11 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 14: Editorial pages & API contract (ADR-025).** Two gaps no test could have caught, found by walking the product and the skills' own checks:
+  - [x] **Terms, returns, privacy, sizing and contact** now exist as server-rendered pages with metadata, sitemap entries and footer links — a payment gateway requires them, and the footer previously showed dead text. `preflight.sh` reports how many policy statements still need the owner's confirmation.
+  - [x] **`openapi.yaml`** (50 operations, 48 schemas) with `npm run api:check`, which derives the real surface from the code and fails when spec and implementation disagree — the `api-architect` skill flagged the absence.
+  - [x] **Level 11 authorization sweep** (`tests/authorization.test.js`): derives every back-office route from the source and asserts anonymous, retail and wholesale callers are all refused, with a positive control for the admin.
+  - [x] **Level 12 editorial page tests** (`tests/content-pages.test.js`): content, metadata, RTL, footer links, sitemap, settings integration, encoding and 404s.
 - [x] **Phase 13: Full Review — and the launch-blocker it found (ADR-024).** A whole-project review (all executable skill scanners plus a hand audit of the running server) found that the demo scaffolding was still reachable on a live shop: an anonymous `POST /api/auth/switch-role` returned an **admin token**, and the sample accounts (shared password, published in this repository) logged in successfully.
   - [x] Role simulator: 404 in production, hidden from the UI via `/api/config`; opt-in only through `ALLOW_DEMO_MODE=true`, which preflight reports as a blocker.
   - [x] Demo accounts: never created in production, filtered out of carried-over snapshots, and refused by the login route *and* the auth middleware; refusals are indistinguishable from a wrong password.

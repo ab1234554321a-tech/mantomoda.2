@@ -806,6 +806,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiMessage'
+  /page/{slug}:
+    get:
+      tags: [Meta]
+      summary: "Editorial page: terms, returns, privacy, sizing or contact (ADR-025). Server-rendered HTML so it reads without JavaScript and carries its own metadata. The contact page prints the shop identity from settings — the same values as the invoice."
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [terms, returns, privacy, sizing, contact]
+      security: []
+      responses:
+        '200':
+          description: The rendered page
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: No such page
+          content:
+            text/html:
+              schema:
+                type: string
   /product/{slug}:
     get:
       tags: [Meta]

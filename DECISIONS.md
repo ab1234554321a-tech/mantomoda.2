@@ -499,3 +499,34 @@ This log contains the record of all major architectural and technical decisions 
   extra piece of configuration that the installer writes for you. Covered by **Level 10** tests
   (`tests/production-guards.test.js`), which boot real production servers and assert every claim above,
   including that development and test still keep the full demo behaviour.
+
+---
+
+## ADR-025: Editorial Pages Are Part of the Product
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: The storefront footer listed «راهنمای انتخاب سایز»، «رویه ارسال و مرجوعی» and
+  «ضمانت اصالت» as inert text with no page behind them, and the shop published no terms, no privacy
+  statement and no contact details. That is not a cosmetic gap: an Iranian payment gateway will not
+  approve a merchant whose site does not publish its return rules, its terms and a way to reach it, so
+  the missing pages were a **launch blocker for taking money at all**. It is also the block of text a
+  customer reads when deciding whether to trust an unfamiliar storefront.
+- **Decision**:
+  - Five server-rendered pages — `terms`, `returns`, `privacy`, `sizing`, `contact` — live at
+    `/page/<slug>`, rendered by `routes/pages.routes.js` from content in `content/pages.js`.
+  - They are plain HTML with their own `<title>`, meta description and canonical URL, and are listed in
+    `sitemap.xml`: a gateway reviewer and a search crawler read them without JavaScript, and the
+    legal text gets indexed like the products do.
+  - The contact page prints the shop identity from **settings**, so the phone number a customer reads
+    is the same one printed on the invoice — no second copy to forget to update.
+  - Statements that are a business promise rather than a technical fact (return window, refund
+    timing, preparation time, opening hours) are drafted with sensible Iranian retail defaults and
+    marked `TODO-OWNER` in the content file. The marker is stripped before rendering and
+    `scripts/preflight.sh` reports how many are still unconfirmed, so a default policy cannot go live
+    silently.
+  - The storefront footer now links to the real pages instead of showing dead text.
+- **Consequences**: The shop has a publishable rulebook, which is a precondition for payment-gateway
+  approval and for customer trust, and the content is editable in one file by a non-developer. The
+  owner must confirm the marked policy statements before launch — preflight says so until she does.
+  Covered by **Level 12** tests (rendering, metadata, RTL, linking from the footer, sitemap presence,
+  settings integration, encoding and 404 behaviour).

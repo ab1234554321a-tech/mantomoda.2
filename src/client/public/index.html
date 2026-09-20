@@ -872,10 +872,15 @@
         </div>
         <div>
           <h5 class="text-white font-bold mb-3">خدمات مشتریان</h5>
+          <!-- These were dead text before: a customer (and a payment-gateway
+               reviewer) needs the actual rules, and the shop needs them
+               published to be approved. Served by pages.routes.js (ADR-025). -->
           <ul class="space-y-2">
-            <li><span>راهنمای انتخاب سایز</span></li>
-            <li><span>رویه ارسال و مرجوعی</span></li>
-            <li><span>ضمانت اصالت و سلامت پارچه</span></li>
+            <li><a href="/page/sizing" class="hover:text-white transition">راهنمای انتخاب سایز</a></li>
+            <li><a href="/page/returns" class="hover:text-white transition">رویه ارسال و مرجوعی</a></li>
+            <li><a href="/page/terms" class="hover:text-white transition">قوانین و مقررات</a></li>
+            <li><a href="/page/privacy" class="hover:text-white transition">حریم خصوصی</a></li>
+            <li><a href="/page/contact" class="hover:text-white transition">تماس با ما</a></li>
           </ul>
         </div>
         <div>

@@ -152,6 +152,21 @@ else
   esac
 fi
 
+head2 "۴.۵) سیاست‌های فروشگاه (تأیید مالک)"
+# Terms, return window and refund timing are business promises, not code. They
+# are drafted with sensible defaults and marked TODO-OWNER until confirmed.
+PAGES_FILE="${PAGES_FILE:-src/server/content/pages.js}"
+if [ -f "$PAGES_FILE" ]; then
+  UNCONFIRMED="$(grep -c 'TODO-OWNER' "$PAGES_FILE" 2>/dev/null || echo 0)"
+  if [ "${UNCONFIRMED:-0}" -gt 0 ]; then
+    warn "$UNCONFIRMED مورد در صفحات قوانین/مرجوعی با مقدار پیش‌فرض منتشر می‌شود — باز کن و تأیید کن: $PAGES_FILE"
+  else
+    ok "سیاست‌های فروشگاه (مرجوعی، بازگشت وجه، ساعات پاسخ‌گویی) تأیید شده‌اند"
+  fi
+else
+  warn "فایل محتوای صفحات پیدا نشد ($PAGES_FILE)"
+fi
+
 head2 "۵) پیامک"
 SMS_PROVIDER_RESOLVED="${SMS_PROVIDER:-kavenegar}"
 case "$SMS_PROVIDER_RESOLVED" in
