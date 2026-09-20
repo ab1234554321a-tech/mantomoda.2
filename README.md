@@ -94,3 +94,24 @@ PERSIST_DATA=true DATA_DIR=/var/lib/mantomoda UPLOAD_DIR=/var/lib/mantomoda/uplo
 ```cron
 30 3 * * * cd /srv/mantomoda && bash scripts/backup.sh --keep 30 >> logs/backup.log 2>&1
 ```
+
+## 10. Back-Office: Running the Shop Without a Developer (Phase 10)
+
+Everything in this table is done from the admin panel; each row is covered by `tests/commerce.test.js`.
+
+| What you can do | Where | Notes |
+|---|---|---|
+| Change shipping tariffs, free-shipping threshold, low-stock threshold, owner mobile, invoice identity | پنل → تنظیمات فروشگاه | Applies immediately to the cart, checkout and invoices |
+| Create a promotion | پنل → کد تخفیف | Percent or fixed, minimum basket, cap, usage/per-customer limits, expiry, retail/wholesale |
+| Add or edit a product | پنل → محصولات → افزودن محصول | Variants (colour/size/stock), unique slug and Latin warehouse SKU generated automatically |
+| Upload product photos | پنل → محصولات → adding image | Converted to WebP + thumbnail, EXIF stripped |
+| Remove a product from sale | پنل → محصولات → برداشتن از فروشگاه | Archived, not deleted: order history stays intact and it can be restored |
+| Fix stock fast | پنل → انبار و موجودی بحرانی | Per colour/size; you get an SMS when something runs low |
+| Find an order | پنل → سفارش‌ها | Search by number, name, mobile, city or coupon; filter by status/payment/date |
+| Export for accounting | پنل → سفارش‌ها → خروجی اکسل (CSV) | UTF-8 BOM CSV — opens correctly in Excel with Persian headers |
+| Send an invoice | پنل → سفارش‌ها → لینک فاکتور | Signed 30-day link; prints cleanly and can be forwarded to an accountant |
+| See how the shop is doing | پنل (dashboard) | Recognised revenue today/month/total, average order value, awaiting payment, best sellers, critical stock |
+| See who changed what | پنل → گزارش اقدامات | Actor, action, entity, timestamp and IP for every successful admin change |
+
+**Recommended first-run setup:** enter the real shipping tariff, set your mobile number under
+تنظیمات فروشگاه (so low-stock alerts reach you), and create your first coupon.

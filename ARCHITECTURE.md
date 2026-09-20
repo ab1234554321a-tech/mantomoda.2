@@ -313,3 +313,24 @@ and purges expired OTP records on an interval.
 **Test gate**: 7 suites (`npm test`) — L1 pricing, L2 wholesale, L3 security/JWT, L4 red team,
 L5 payments, L6 OTP, L7 operations (inventory, lifecycle, notifications, SEO, uploads, persistence
 over real HTTP).
+
+## 13. Back-Office Layer (added 2026-09-20 — ADR-017..020)
+
+The shop can now be operated by its owner without a developer.
+
+| Capability | Module | What it means for the business |
+|---|---|---|
+| Shop settings | `db.getSettings/updateSettings` + `PUT /api/admin/settings` | Shipping tariffs, free-shipping threshold, low-stock threshold, owner mobile and invoice identity are data, not code |
+| Pricing policy | `services/pricing/shipping.service.js` | One implementation of shipping/totals; cart and checkout can no longer disagree |
+| Coupons | `services/pricing/coupon.service.js` + `db.coupons` | Percent/fixed, minimum basket, cap, usage limits, expiry, retail/wholesale channel; 422 with a specific reason when refused |
+| Product management | `services/catalog/product.service.js` + admin routes | Validated create/edit with generated slug + Latin SKU, variant editing, archive/restore instead of destructive delete |
+| Inventory operations | `PUT /api/admin/inventory/bulk`, `GET /api/admin/inventory/low-stock` | Fix stock per colour/size in one screen; low-stock alert SMS to the owner (throttled) |
+| Orders | `db.searchOrders` + `/api/admin/orders`, `/export.csv` | Search by number/customer/phone/city/coupon, filter by status/payment/date, paginate, export for accounting (BOM CSV) |
+| Invoice | `services/invoice.service.js` + `routes/invoice.routes.js` | Owner-only JSON invoice, plus a signed 30-day link rendering a printable, noindex page that a customer can forward |
+| Reporting | `db.revenueSummary` | Recognised revenue (paid/confirmed — cancellations excluded), today/month/total, average order value, best sellers, awaiting payment |
+| Audit trail | `middlewares/admin-audit.js` + `GET /api/admin/audit-log` | Every successful admin change records who/when/what/IP; secrets are redacted; log bounded to 2000 entries |
+| Admin UI | `app.js` (dashboard + 7 tabs) | KPI cards, product form with variant editor, inventory quick-edit, coupon manager, settings editor, audit view, CSV export, invoice links |
+
+**Test gate**: `npm test` now runs **8 suites**; `tests/commerce.test.js` (Level 8) covers pricing,
+coupons, catalog validation, low-stock alerts, order search/export, invoices (including tamper and
+expiry), dashboard accuracy, the audit trail, settings propagation and archive semantics.

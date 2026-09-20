@@ -17,6 +17,7 @@ const state = {
   searchQuery: '',
   currentView: 'catalog',
   activeAdminTab: 'wholesale',
+  couponCode: sessionStorage.getItem('mm_coupon') || '',
   selectedProduct: null,
   // Catalog pagination (ADR-014). The grid renders the first page and appends
   // more on demand, so the first paint stays small on mobile connections.
@@ -615,13 +616,63 @@ async function recalculateCart() {
 
   const res = await apiFetch('/api/cart/calculate', {
     method: 'POST',
-    body: JSON.stringify({ items: state.cart })
+    body: JSON.stringify({
+      items: state.cart,
+      couponCode: state.couponCode || undefined,
+      // The shipping tariff depends on the destination province, so the cart
+      // asks for it as soon as the customer has entered one.
+      shippingAddress: { province: state.checkoutProvince || '' }
+    })
   });
 
   if (res.success) {
     state.cartCalculation = res.data;
     renderCartUI();
   }
+}
+
+/**
+ * Applies a coupon locally then re-asks the server, which is the only authority
+ * on whether the code is valid for this basket (ADR-018).
+ */
+async function applyCouponCode() {
+  const input = document.getElementById('cart-coupon-input');
+  const code = (input?.value || '').trim().toUpperCase();
+  const messageEl = document.getElementById('cart-coupon-message');
+
+  if (!code) {
+    state.couponCode = '';
+    sessionStorage.removeItem('mm_coupon');
+    if (messageEl) messageEl.classList.add('hidden');
+    return recalculateCart();
+  }
+
+  state.couponCode = code;
+  sessionStorage.setItem('mm_coupon', code);
+
+  await recalculateCart();
+
+  const coupon = state.cartCalculation?.coupon;
+  if (messageEl && coupon) {
+    messageEl.textContent = coupon.message || '';
+    messageEl.className = `text-[11px] mt-1.5 ${coupon.applied ? 'text-emerald-700' : 'text-rose-600'}`;
+    messageEl.classList.remove('hidden');
+  }
+
+  if (coupon && !coupon.applied) {
+    state.couponCode = '';
+    sessionStorage.removeItem('mm_coupon');
+  }
+}
+
+function clearCoupon() {
+  state.couponCode = '';
+  sessionStorage.removeItem('mm_coupon');
+  const input = document.getElementById('cart-coupon-input');
+  if (input) input.value = '';
+  const messageEl = document.getElementById('cart-coupon-message');
+  if (messageEl) messageEl.classList.add('hidden');
+  recalculateCart();
 }
 
 function renderCartUI() {
@@ -632,6 +683,10 @@ function renderCartUI() {
   const savingsEl = document.getElementById('cart-savings');
   const shippingEl = document.getElementById('cart-shipping');
   const payableEl = document.getElementById('cart-payable');
+  const discountRow = document.getElementById('cart-discount-row');
+  const discountEl = document.getElementById('cart-discount');
+  const couponCodeEl = document.getElementById('cart-coupon-code');
+  const couponInput = document.getElementById('cart-coupon-input');
   const checkoutBtn = document.getElementById('cart-checkout-btn');
 
   if (!list) return;
@@ -706,7 +761,26 @@ function renderCartUI() {
     if (savingsRow) savingsRow.classList.add('hidden');
   }
 
-  shippingEl.textContent = data.shippingFee === 0 ? 'رایگان' : formatPrice(data.shippingFee);
+  shippingEl.textContent = data.shippingFee === 0
+    ? (data.shipping?.isFree ? 'رایگان ✓' : 'رایگان')
+    : formatPrice(data.shippingFee);
+
+  if (data.shipping?.description) shippingEl.title = data.shipping.description;
+
+  // Discount row: only visible when a coupon actually reduced the basket.
+  if (discountRow && discountEl) {
+    if (data.discountAmount > 0) {
+      discountRow.classList.remove('hidden');
+      discountRow.classList.add('flex');
+      discountEl.textContent = `− ${formatPrice(data.discountAmount)}`;
+      if (couponCodeEl) couponCodeEl.textContent = data.coupon?.code ? `(${data.coupon.code})` : '';
+    } else {
+      discountRow.classList.add('hidden');
+    }
+  }
+
+  if (couponInput && !couponInput.value && state.couponCode) couponInput.value = state.couponCode;
+
   payableEl.textContent = formatPrice(data.payableAmount);
 }
 
@@ -765,7 +839,10 @@ async function submitOrder(e) {
   const orderPayload = {
     items: state.cart,
     shippingAddress: { recipientName, phone, province, city, fullAddress, postalCode },
-    paymentMethod
+    paymentMethod,
+    // The coupon is re-validated server-side; a stale or invented code fails the
+    // checkout with a clear message rather than silently charging full price.
+    ...(state.couponCode ? { couponCode: state.couponCode } : {})
   };
 
   const res = await apiFetch('/api/orders', {
@@ -777,6 +854,8 @@ async function submitOrder(e) {
     state.cart = [];
     saveCart();
     state.cartCalculation = null;
+    state.couponCode = '';
+    sessionStorage.removeItem('mm_coupon');
 
     const order = res.data;
 
@@ -1030,14 +1109,19 @@ async function submitWholesaleForm(e) {
 }
 
 // Admin Dashboard Logic
+const ADMIN_TABS = ['wholesale', 'orders', 'products', 'inventory', 'coupons', 'settings', 'audit'];
+
 function switchAdminTab(tab) {
   state.activeAdminTab = tab;
 
-  document.getElementById('admin-tab-wholesale').classList.toggle('hidden', tab !== 'wholesale');
-  document.getElementById('admin-tab-orders').classList.toggle('hidden', tab !== 'orders');
-  document.getElementById('admin-tab-products').classList.toggle('hidden', tab !== 'products');
+  for (const t of ADMIN_TABS) {
+    const panel = document.getElementById(`admin-tab-${t}`);
+    if (panel) panel.classList.toggle('hidden', t !== tab);
+  }
+  // The dashboard is always visible above the tabs.
+  document.getElementById('admin-dashboard')?.classList.remove('hidden');
 
-  ['wholesale', 'orders', 'products'].forEach(t => {
+  ADMIN_TABS.forEach(t => {
     const btn = document.getElementById(`admin-tab-btn-${t}`);
     if (btn) {
       if (t === tab) {
@@ -1051,19 +1135,10 @@ function switchAdminTab(tab) {
   if (tab === 'wholesale') loadAdminWholesale();
   if (tab === 'orders') loadAdminOrders();
   if (tab === 'products') loadAdminProducts();
-}
-
-async function loadAdminDashboard() {
-  const res = await apiFetch('/api/admin/stats');
-  if (res.success) {
-    const s = res.data;
-    document.getElementById('kpi-revenue').textContent = formatPrice(s.totalRevenue);
-    document.getElementById('kpi-pending-wholesale').textContent = toPersianDigits(s.pendingWholesaleCount);
-    document.getElementById('admin-kpi-pending-badge').textContent = toPersianDigits(s.pendingWholesaleCount);
-    document.getElementById('kpi-orders-count').textContent = toPersianDigits(s.ordersCount);
-    document.getElementById('kpi-products-count').textContent = toPersianDigits(s.productsCount);
-  }
-  switchAdminTab(state.activeAdminTab);
+  if (tab === 'inventory') loadLowStock();
+  if (tab === 'coupons') loadCoupons();
+  if (tab === 'settings') loadSettings();
+  if (tab === 'audit') loadAuditLog();
 }
 
 async function loadAdminWholesale() {
@@ -1115,9 +1190,42 @@ async function reviewWholesaleApp(appId, status) {
   }
 }
 
-async function loadAdminOrders() {
+async function loadAdminOrders(params = {}) {
   const container = document.getElementById('admin-orders-table');
-  const res = await apiFetch('/api/admin/orders');
+  const controls = document.getElementById('admin-orders-controls');
+
+  const query = new URLSearchParams();
+  if (params.search) query.set('search', params.search);
+  if (params.status) query.set('status', params.status);
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+
+  const res = await apiFetch(`/api/admin/orders?${query.toString()}`);
+
+  if (controls) {
+    controls.innerHTML = `
+      <div class="flex flex-wrap items-end gap-2 mb-4">
+        <label class="text-[11px] font-bold text-slate-600">جست‌وجو (شماره سفارش، نام، موبایل، شهر)
+          <input id="order-search" value="${escapeAttr(params.search || '')}" aria-label="جست‌وجوی سفارش"
+                 class="mt-1 block w-64 text-xs border border-slate-300 rounded-xl px-3 py-2 font-normal">
+        </label>
+        <label class="text-[11px] font-bold text-slate-600">وضعیت
+          <select id="order-status-filter" aria-label="فیلتر وضعیت سفارش" class="mt-1 block text-xs border border-slate-300 rounded-xl px-3 py-2 font-normal">
+            <option value="">همه</option>
+            ${['PENDING','CONFIRMED','PROCESSING','SHIPPED','DELIVERED','CANCELLED'].map(st => `
+              <option value="${st}" ${params.status === st ? 'selected' : ''}>${translateOrderStatus(st)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="text-[11px] font-bold text-slate-600">از تاریخ
+          <input id="order-from" type="date" value="${escapeAttr(params.from || '')}" aria-label="از تاریخ" class="mt-1 block text-xs border border-slate-300 rounded-xl px-3 py-2 font-normal">
+        </label>
+        <label class="text-[11px] font-bold text-slate-600">تا تاریخ
+          <input id="order-to" type="date" value="${escapeAttr(params.to || '')}" aria-label="تا تاریخ" class="mt-1 block text-xs border border-slate-300 rounded-xl px-3 py-2 font-normal">
+        </label>
+        <button type="button" onclick="applyOrderFilters()" class="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">اعمال فیلتر</button>
+        <button type="button" onclick="exportOrdersCsv()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">خروجی اکسل (CSV)</button>
+      </div>`;
+  }
 
   if (res.success) {
     container.innerHTML = res.data.map(order => `
@@ -1147,15 +1255,32 @@ async function loadAdminOrders() {
           اقلام: ${order.items.map(i => `${i.productTitle} (${i.quantity} عدد)`).join('، ')}
         </div>
 
-        <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
-          <span class="text-slate-500">نوع: ${order.orderType === 'WHOLESALE' ? 'عمده‌فروشی' : 'خرده‌فروشی'} | پرداخت: ${translatePaymentStatus(order.paymentStatus)}</span>
-          <span class="font-bold font-mono text-slate-900">${formatPrice(order.payableAmount)}</span>
+        <div class="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+          <span class="text-slate-500">
+            نوع: ${order.orderType === 'WHOLESALE' ? 'عمده‌فروشی' : 'خرده‌فروشی'} | پرداخت: ${translatePaymentStatus(order.paymentStatus)}
+            ${order.couponCode ? ` | کد تخفیف: <span class="font-mono font-bold">${escapeAttr(order.couponCode)}</span>` : ''}
+          </span>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyInvoiceLink('${order.id}')"
+                    class="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-300 text-[11px] font-bold">لینک فاکتور</button>
+            <a href="/api/orders/${order.id}/invoice-link" onclick="return false;" class="hidden" aria-hidden="true">—</a>
+            <span class="font-bold font-mono text-slate-900">${formatPrice(order.payableAmount)}</span>
+          </div>
         </div>
 
         ${renderOrderHistory(order)}${renderOrderNotifications(order)}
       </div>
     `).join('');
   }
+}
+
+function applyOrderFilters() {
+  loadAdminOrders({
+    search: document.getElementById('order-search')?.value.trim() || '',
+    status: document.getElementById('order-status-filter')?.value || '',
+    from: document.getElementById('order-from')?.value || '',
+    to: document.getElementById('order-to')?.value || ''
+  });
 }
 
 async function updateOrderStatusAdmin(orderId, status) {
@@ -1193,14 +1318,43 @@ function renderOrderHistory(order) {
 async function loadAdminProducts() {
   const container = document.getElementById('admin-products-table');
   const res = await apiFetch('/api/admin/products');
+  const filterBar = document.getElementById('admin-products-filter');
 
   if (res.success) {
-    container.innerHTML = res.data.map(p => `
+    if (filterBar) {
+      const counts = res.meta || {};
+      filterBar.innerHTML = `
+        <div class="flex items-center gap-2 text-[11px] mb-3">
+          <button type="button" onclick="setProductFilter('all')" class="px-3 py-1.5 rounded-lg font-bold ${adminProductsFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}">
+            همه (${toPersianDigits((counts.activeCount || 0) + (counts.archivedCount || 0))})
+          </button>
+          <button type="button" onclick="setProductFilter('active')" class="px-3 py-1.5 rounded-lg font-bold ${adminProductsFilter === 'active' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}">
+            فعال (${toPersianDigits(counts.activeCount || 0)})
+          </button>
+          <button type="button" onclick="setProductFilter('archived')" class="px-3 py-1.5 rounded-lg font-bold ${adminProductsFilter === 'archived' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}">
+            آرشیو (${toPersianDigits(counts.archivedCount || 0)})
+          </button>
+        </div>`;
+    }
+
+    const visible = adminProductsFilter === 'all'
+      ? res.data
+      : res.data.filter(p => (adminProductsFilter === 'archived' ? p.isArchived : !p.isArchived));
+
+    if (visible.length === 0) {
+      container.innerHTML = '<p class="text-xs text-slate-400">محصولی در این فهرست نیست.</p>';
+      return;
+    }
+
+    container.innerHTML = visible.map(p => `
       <div class="p-4 rounded-2xl border border-slate-200 bg-white flex flex-wrap items-center justify-between gap-4 shadow-sm">
         <div class="flex items-center gap-3">
           <img src="${p.images[0]}" alt="${escapeAttr(p.title || 'تصویر محصول')}" class="w-12 h-16 object-cover rounded-xl border border-slate-200">
           <div>
-            <h4 class="font-bold text-xs text-slate-900">${p.title}</h4>
+            <h4 class="font-bold text-xs text-slate-900">
+              ${escapeAttr(p.title)}
+              ${p.isArchived ? '<span class="text-[10px] font-bold text-rose-600 mr-1">(آرشیو شده)</span>' : ''}
+            </h4>
             <div class="text-[11px] text-slate-500 font-mono">${p.sku} | ${p.category}</div>
           </div>
         </div>
@@ -1217,6 +1371,16 @@ async function loadAdminProducts() {
             <span class="text-slate-400 block text-[10px]">موجودی کل:</span>
             <span class="font-mono font-bold ${totalStock(p) > 0 ? 'text-slate-800' : 'text-rose-600'}">${toPersianDigits(totalStock(p))}</span>
           </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-[11px]">
+          <button type="button" onclick="editProduct('${p.id}')"
+                  class="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-300 font-bold hover:bg-slate-50">ویرایش</button>
+          ${p.isArchived
+            ? `<button type="button" onclick="restoreProduct('${p.id}')"
+                       class="px-3 py-1.5 min-h-[36px] rounded-lg border border-emerald-200 text-emerald-700 font-bold">بازگرداندن به فروشگاه</button>`
+            : `<button type="button" onclick="archiveProduct('${p.id}')"
+                       class="px-3 py-1.5 min-h-[36px] rounded-lg border border-rose-200 text-rose-600 font-bold">برداشتن از فروشگاه</button>`}
         </div>
 
         <!-- Product image upload (ADR-013): the photo IS the product for a boutique -->
@@ -1283,6 +1447,11 @@ function renderOrderNotifications(order) {
   `;
 }
 
+function setProductFilter(filter) {
+  adminProductsFilter = filter;
+  loadAdminProducts();
+}
+
 /** Total stock across all variants — the number an admin actually cares about. */
 function totalStock(product) {
   return (product.variants || []).reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
@@ -1325,6 +1494,507 @@ async function uploadProductImage(productId, inputEl) {
     inputEl.value = '';
   }
 }
+
+
+// =============================================================================
+//  Admin panel logic (Phase 10)
+//  Every action talks to the API, which re-validates everything: the UI is a
+//  convenience layer, never the authority.
+// =============================================================================
+
+function persianNumber(value) {
+  return Number(value || 0).toLocaleString('fa-IR');
+}
+
+function formatToman(value) {
+  return `${persianNumber(value)} تومان`;
+}
+
+/** KPI cards answering the owner's morning questions. */
+async function loadAdminDashboard() {
+  const res = await apiFetch('/api/admin/stats');
+  if (!res.success) return;
+
+  const d = res.data;
+
+  const cards = [
+    { label: 'فروش تأییدشده امروز', value: formatToman(d.revenueToday), hint: `${persianNumber(d.ordersToday)} سفارش امروز${d.pendingOrdersToday ? ` — ${persianNumber(d.pendingOrdersToday)} در انتظار پرداخت (${formatToman(d.pendingRevenueToday)})` : ''}`, tone: 'emerald' },
+    { label: 'فروش این ماه', value: formatToman(d.revenueThisMonth), hint: `میانگین هر سفارش: ${formatToman(d.averageOrderValue)}`, tone: 'brand' },
+    { label: 'در انتظار اقدام', value: persianNumber(d.pendingOrdersCount), hint: `${persianNumber(d.pendingWholesaleCount)} درخواست عمده‌فروشی معلق`, tone: 'amber' },
+    { label: 'موجودی بحرانی', value: persianNumber(d.lowStock?.length || 0), hint: `${persianNumber(d.outOfStockVariants)} تنوع ناموجود`, tone: 'rose' }
+  ];
+
+  const toneClass = {
+    emerald: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+    brand: 'text-brand-700 bg-brand-50 border-brand-100',
+    amber: 'text-amber-700 bg-amber-50 border-amber-100',
+    rose: 'text-rose-700 bg-rose-50 border-rose-100'
+  };
+
+  const container = document.getElementById('admin-kpi-cards');
+  if (container) {
+    container.innerHTML = cards.map(c => `
+      <div class="p-4 rounded-2xl border ${toneClass[c.tone]}">
+        <div class="text-[11px] font-bold opacity-80">${c.label}</div>
+        <div class="text-lg font-black mt-1">${c.value}</div>
+        <div class="text-[10px] opacity-70 mt-1">${c.hint}</div>
+      </div>
+    `).join('');
+  }
+
+  const top = document.getElementById('admin-top-products');
+  if (top) {
+    top.innerHTML = (d.topProducts || []).length
+      ? d.topProducts.map((p, i) => `
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+            <span>${toPersianDigits(i + 1)}. ${escapeAttr(p.title || '—')}</span>
+            <span class="font-bold text-slate-800">${toPersianDigits(p.quantity)} عدد — ${formatToman(p.revenue)}</span>
+          </div>`).join('')
+      : '<p class="text-slate-400">هنوز فروشی ثبت نشده است.</p>';
+  }
+
+  const low = document.getElementById('admin-low-stock');
+  if (low) {
+    low.innerHTML = (d.lowStock || []).length
+      ? d.lowStock.slice(0, 6).map(item => `
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+            <span>${escapeAttr(item.productTitle)} — ${escapeAttr(item.color || '')} ${escapeAttr(item.size || '')}</span>
+            <span class="font-bold ${item.stock === 0 ? 'text-rose-600' : 'text-amber-600'}">${toPersianDigits(item.stock)} عدد</span>
+          </div>`).join('')
+      : '<p class="text-emerald-600 font-bold">موجودی همه اقلام سالم است ✅</p>';
+  }
+
+  // Legacy KPI tiles in the admin header (kept in sync with the new cards).
+  const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  setText('kpi-revenue', formatPrice(d.revenueAllTime));
+  setText('kpi-pending-wholesale', toPersianDigits(d.pendingWholesaleCount));
+  setText('admin-kpi-pending-badge', toPersianDigits(d.pendingWholesaleCount));
+  setText('kpi-orders-count', toPersianDigits(d.ordersBillable || d.billableOrders));
+  setText('kpi-products-count', toPersianDigits(d.productsCount));
+}
+
+// ---------------------------------------------------------------------------
+// Product create / edit
+// ---------------------------------------------------------------------------
+let editingProductId = null;
+
+function openAddProductModal() {
+  editingProductId = null;
+  document.getElementById('admin-product-modal-title').textContent = 'افزودن محصول جدید';
+  document.getElementById('admin-product-form').reset();
+  document.getElementById('pf-variants').innerHTML = '';
+  addVariantRow();
+  fillCategorySuggestions();
+  document.getElementById('admin-product-modal').classList.remove('hidden');
+  document.getElementById('pf-title')?.focus();
+}
+
+function closeAdminProductModal() {
+  document.getElementById('admin-product-modal').classList.add('hidden');
+}
+
+async function fillCategorySuggestions() {
+  if (state.categories.length === 0) await fetchCategories();
+  const list = document.getElementById('pf-category-list');
+  if (list) list.innerHTML = state.categories.map(c => `<option value="${escapeAttr(c.name)}"></option>`).join('');
+}
+
+function addVariantRow(variant = {}) {
+  const container = document.getElementById('pf-variants');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'grid grid-cols-12 gap-2 items-center';
+  row.innerHTML = `
+    <input type="hidden" class="v-id" value="${escapeAttr(variant.id || '')}">
+    <input class="v-color col-span-4 text-xs border border-slate-300 rounded-lg px-2 py-1.5" placeholder="رنگ (مثلاً مشکی)" aria-label="رنگ" value="${escapeAttr(variant.color || '')}">
+    <input class="v-size col-span-2 text-xs border border-slate-300 rounded-lg px-2 py-1.5" placeholder="سایز" aria-label="سایز" value="${escapeAttr(variant.size || '')}">
+    <input class="v-stock col-span-2 text-xs border border-slate-300 rounded-lg px-2 py-1.5" type="number" min="0" placeholder="موجودی" aria-label="موجودی" value="${variant.stock ?? 0}">
+    <input class="v-hex col-span-2 text-xs border border-slate-300 rounded-lg px-2 py-1.5" placeholder="#000000" aria-label="کد رنگ" value="${escapeAttr(variant.colorHex || '#000000')}">
+    <button type="button" class="col-span-2 text-[11px] font-bold text-rose-600 hover:text-rose-700" onclick="this.closest('div').remove()">حذف</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectVariants() {
+  return [...document.querySelectorAll('#pf-variants > div')].map(row => ({
+    id: row.querySelector('.v-id')?.value || undefined,
+    color: row.querySelector('.v-color')?.value.trim(),
+    size: row.querySelector('.v-size')?.value.trim(),
+    colorHex: row.querySelector('.v-hex')?.value.trim() || '#000000',
+    stock: Number(row.querySelector('.v-stock')?.value || 0)
+  })).filter(v => v.color && v.size);
+}
+
+async function editProduct(productId) {
+  const res = await apiFetch(`/api/admin/products`);
+  const product = (res.data || []).find(p => p.id === productId);
+  if (!product) return showToast('محصول یافت نشد.', 'error');
+
+  editingProductId = productId;
+  document.getElementById('admin-product-modal-title').textContent = `ویرایش «${product.title}»`;
+  document.getElementById('pf-title').value = product.title;
+  document.getElementById('pf-category').value = product.category;
+  document.getElementById('pf-retail').value = product.retailPrice;
+  document.getElementById('pf-wholesale').value = product.wholesalePrice || '';
+  document.getElementById('pf-wholesale-min').value = product.wholesaleMinQuantity || 6;
+  document.getElementById('pf-material').value = product.material || '';
+  document.getElementById('pf-season').value = product.season || 'چهار فصل';
+  document.getElementById('pf-featured').checked = Boolean(product.isFeatured);
+  document.getElementById('pf-description').value = product.description || '';
+
+  const variants = document.getElementById('pf-variants');
+  variants.innerHTML = '';
+  (product.variants || []).forEach(v => addVariantRow(v));
+  if (!(product.variants || []).length) addVariantRow();
+
+  await fillCategorySuggestions();
+  document.getElementById('admin-product-modal').classList.remove('hidden');
+  document.getElementById('pf-title')?.focus();
+}
+
+async function saveProduct(event) {
+  event.preventDefault();
+
+  const variants = collectVariants();
+  if (variants.length === 0) {
+    return showToast('حداقل یک تنوع کالا با رنگ و سایز لازم است.', 'error');
+  }
+
+  const payload = {
+    title: document.getElementById('pf-title').value.trim(),
+    category: document.getElementById('pf-category').value.trim(),
+    retailPrice: Number(document.getElementById('pf-retail').value),
+    wholesalePrice: Number(document.getElementById('pf-wholesale').value) || undefined,
+    wholesaleMinQuantity: Number(document.getElementById('pf-wholesale-min').value) || 6,
+    material: document.getElementById('pf-material').value.trim(),
+    season: document.getElementById('pf-season').value.trim() || 'چهار فصل',
+    isFeatured: document.getElementById('pf-featured').checked,
+    description: document.getElementById('pf-description').value.trim(),
+    variants
+  };
+
+  const res = editingProductId
+    ? await apiFetch(`/api/admin/products/${editingProductId}`, { method: 'PUT', body: JSON.stringify(payload) })
+    : await apiFetch('/api/admin/products', { method: 'POST', body: JSON.stringify(payload) });
+
+  if (res.success) {
+    showToast(res.message, 'success');
+    closeAdminProductModal();
+    await loadAdminProducts();
+    await loadAdminDashboard();
+    await fetchProducts();
+  } else {
+    const detail = res.details?.[0]?.message;
+    showToast(detail || res.message || 'ثبت محصول ناموفق بود.', 'error');
+  }
+}
+
+async function archiveProduct(productId) {
+  if (!confirm('این محصول از فروشگاه برداشته می‌شود (سفارش‌های قبلی حفظ می‌شوند). مطمئنید؟')) return;
+  const res = await apiFetch(`/api/admin/products/${productId}`, { method: 'DELETE' });
+  showToast(res.message || 'انجام شد.', res.success ? 'success' : 'error');
+  if (res.success) {
+    await loadAdminProducts();
+    await loadAdminDashboard();
+    await fetchProducts();
+  }
+}
+
+async function restoreProduct(productId) {
+  const res = await apiFetch(`/api/admin/products/${productId}/restore`, { method: 'POST' });
+  showToast(res.message || 'انجام شد.', res.success ? 'success' : 'error');
+  if (res.success) {
+    await loadAdminProducts();
+    await loadAdminDashboard();
+    await fetchProducts();
+  }
+}
+
+let adminProductsFilter = 'all';
+
+async function loadAdminProductsFilter(filter) {
+  adminProductsFilter = filter;
+  await loadAdminProducts();
+}
+
+// ---------------------------------------------------------------------------
+// Inventory quick edit
+// ---------------------------------------------------------------------------
+async function loadLowStock() {
+  const threshold = document.getElementById('low-stock-threshold')?.value;
+  const res = await apiFetch(`/api/admin/inventory/low-stock${threshold !== undefined ? `?threshold=${encodeURIComponent(threshold)}` : ''}`);
+  const container = document.getElementById('admin-low-stock-table');
+  if (!container) return;
+
+  if (!res.success || !res.data.length) {
+    container.innerHTML = '<p class="text-emerald-600 font-bold text-xs">با این آستانه، موجودی هیچ قلمی بحرانی نیست ✅</p>';
+    return;
+  }
+
+  container.innerHTML = res.data.map(item => `
+    <div class="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl border border-slate-200">
+      <div class="text-xs">
+        <div class="font-bold text-slate-800">${escapeAttr(item.productTitle)}</div>
+        <div class="text-slate-500">${escapeAttr(item.color || '')} — سایز ${escapeAttr(item.size || '')} | آستانه ${toPersianDigits(item.threshold)}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold ${item.stock === 0 ? 'text-rose-600' : 'text-amber-600'}">${toPersianDigits(item.stock)} عدد</span>
+        <input type="number" min="0" value="${item.stock}" aria-label="موجودی جدید برای ${escapeAttr(item.productTitle)}"
+               id="stock-${item.variantId}" class="w-20 text-xs border border-slate-300 rounded-lg px-2 py-1">
+        <button type="button" onclick="saveVariantStock('${item.productId}', '${item.variantId}')"
+                class="px-3 py-1.5 min-h-[36px] rounded-lg bg-slate-900 text-white text-[11px] font-bold">ثبت موجودی</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function saveVariantStock(productId, variantId) {
+  const input = document.getElementById(`stock-${variantId}`);
+  const stock = Number(input?.value || 0);
+
+  const res = await apiFetch('/api/admin/inventory/bulk', {
+    method: 'PUT',
+    body: JSON.stringify({ updates: [{ productId, variantId, stock }] })
+  });
+
+  showToast(res.message || 'انجام شد.', res.success ? 'success' : 'error');
+  await loadLowStock();
+  await loadAdminDashboard();
+  await fetchProducts();
+}
+
+// ---------------------------------------------------------------------------
+// Coupons
+// ---------------------------------------------------------------------------
+async function createCoupon(event) {
+  event.preventDefault();
+
+  const payload = {
+    code: document.getElementById('coupon-code').value.trim(),
+    type: document.getElementById('coupon-type').value,
+    value: Number(document.getElementById('coupon-value').value),
+    minBasket: Number(document.getElementById('coupon-min-basket').value) || 0,
+    maxDiscount: Number(document.getElementById('coupon-max-discount').value) || null,
+    expiresAt: document.getElementById('coupon-expires').value || null,
+    usageLimit: Number(document.getElementById('coupon-usage-limit').value) || null,
+    perUserLimit: Number(document.getElementById('coupon-per-user').value) || null,
+    appliesTo: document.getElementById('coupon-applies').value
+  };
+
+  const res = await apiFetch('/api/admin/coupons', { method: 'POST', body: JSON.stringify(payload) });
+  showToast(res.message || (res.success ? 'ساخته شد.' : 'ساخت کد ناموفق بود.'), res.success ? 'success' : 'error');
+
+  if (res.success) {
+    document.getElementById('admin-coupons-table')?.closest('form')?.reset();
+    event.target.reset();
+    await loadCoupons();
+  }
+}
+
+async function loadCoupons() {
+  const res = await apiFetch('/api/admin/coupons');
+  const container = document.getElementById('admin-coupons-table');
+  if (!container) return;
+
+  if (!res.success || !res.data.length) {
+    container.innerHTML = '<p class="text-slate-400 text-xs">هنوز کد تخفیفی ساخته نشده است.</p>';
+    return;
+  }
+
+  container.innerHTML = res.data.map(c => `
+    <div class="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl border ${c.isActive ? 'border-slate-200' : 'border-slate-200 bg-slate-50'}">
+      <div class="text-xs">
+        <div class="font-black font-mono text-slate-900">${escapeAttr(c.code)}
+          <span class="font-normal text-slate-500">
+            ${c.type === 'PERCENT' ? `${toPersianDigits(c.value)}٪` : formatToman(c.value)}
+            ${c.minBasket ? ` | حداقل سبد ${formatToman(c.minBasket)}` : ''}
+            ${c.maxDiscount ? ` | سقف ${formatToman(c.maxDiscount)}` : ''}
+          </span>
+        </div>
+        <div class="text-slate-500 mt-0.5">
+          استفاده‌شده: ${toPersianDigits(c.usedCount || 0)}${c.usageLimit ? ` از ${toPersianDigits(c.usageLimit)}` : ''}
+          ${c.expiresAt ? ` | انقضا: ${new Date(c.expiresAt).toLocaleDateString('fa-IR')}` : ''}
+          ${c.isActive ? '' : ' | <span class="text-rose-600 font-bold">غیرفعال</span>'}
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="toggleCoupon('${c.id}', ${c.isActive})"
+                class="px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-300 text-[11px] font-bold">
+          ${c.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
+        </button>
+        <button type="button" onclick="archiveCoupon('${c.id}')"
+                class="px-3 py-1.5 min-h-[36px] rounded-lg border border-rose-200 text-rose-600 text-[11px] font-bold">آرشیو</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleCoupon(id, isActive) {
+  const res = await apiFetch(`/api/admin/coupons/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: !isActive }) });
+  showToast(res.message || 'به‌روزرسانی شد.', res.success ? 'success' : 'error');
+  await loadCoupons();
+}
+
+async function archiveCoupon(id) {
+  if (!confirm('این کد تخفیف آرشیو شود؟ سابقه سفارش‌های قبلی حفظ می‌شود.')) return;
+  const res = await apiFetch(`/api/admin/coupons/${id}`, { method: 'DELETE' });
+  showToast(res.message || 'آرشیو شد.', res.success ? 'success' : 'error');
+  await loadCoupons();
+}
+
+// ---------------------------------------------------------------------------
+// Shop settings
+// ---------------------------------------------------------------------------
+async function loadSettings() {
+  const res = await apiFetch('/api/admin/settings');
+  const container = document.getElementById('admin-settings-form');
+  if (!container || !res.success) return;
+
+  const s = res.data;
+  const field = (id, label, value, type = 'number', hint = '') => `
+    <label class="block text-xs font-bold text-slate-700">${label}
+      <input id="${id}" type="${type}" value="${escapeAttr(value ?? '')}" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+      ${hint ? `<span class="block text-[10px] font-normal text-slate-400 mt-0.5">${hint}</span>` : ''}
+    </label>`;
+
+  container.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      ${field('set-flat-fee', 'تعرفه ارسال پیش‌فرض (تومان)', s.shipping.flatFee, 'number', 'برای استان‌هایی که تعرفه اختصاصی ندارند')}
+      ${field('set-free-threshold', 'آستانه ارسال رایگان (تومان)', s.shipping.freeShippingThreshold, 'number', 'سفارش بالای این مبلغ ارسال رایگان دارد')}
+      ${field('set-low-stock', 'آستانه هشدار موجودی (عدد)', s.inventory.lowStockThreshold, 'number', 'وقتی موجودی به این عدد رسید پیامک هشدار می‌آید')}
+      ${field('set-alert-hours', 'فاصله بین هشدارها (ساعت)', s.inventory.alertThrottleHours, 'number')}
+      ${field('set-owner-mobile', 'موبایل صاحب فروشگاه (برای هشدار موجودی)', s.shop.ownerMobile, 'tel', 'اگر خالی باشد هشدار پیامکی ارسال نمی‌شود')}
+      ${field('set-support-phone', 'تلفن پشتیبانی (روی فاکتور)', s.shop.supportPhone, 'tel')}
+      ${field('set-shop-name', 'نام فروشگاه', s.shop.name, 'text')}
+      ${field('set-shop-address', 'نشانی (روی فاکتور)', s.shop.address, 'text')}
+      ${field('set-tax-id', 'شناسه/کد اقتصادی (روی فاکتور)', s.shop.taxId, 'text')}
+      ${field('set-invoice-note', 'متن پایانی فاکتور', s.shop.invoiceFooterNote, 'text')}
+    </div>
+
+    <details class="mt-5">
+      <summary class="text-xs font-bold text-slate-600 cursor-pointer">تعرفه ارسال هر استان (تومان)</summary>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+        ${Object.entries(s.shipping.provinceFees || {}).map(([province, fee]) => `
+          <label class="flex items-center gap-2 text-[11px]">
+            <span class="w-20 text-slate-600">${escapeAttr(province)}</span>
+            <input class="province-fee flex-1 border border-slate-200 rounded-lg px-2 py-1" data-province="${escapeAttr(province)}" value="${fee}" type="number" min="0" aria-label="تعرفه ارسال ${escapeAttr(province)}">
+          </label>`).join('')}
+      </div>
+    </details>
+
+    <div class="mt-5 flex items-center gap-2">
+      <button type="button" onclick="saveSettings()" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">ذخیره تنظیمات</button>
+      <span class="text-[11px] text-slate-400">تغییرات بلافاصله روی سبد خرید و فاکتورها اعمال می‌شود.</span>
+    </div>
+  `;
+}
+
+async function saveSettings() {
+  const provinceFees = {};
+  document.querySelectorAll('.province-fee').forEach(input => {
+    provinceFees[input.dataset.province] = Number(input.value);
+  });
+
+  const payload = {
+    shipping: {
+      flatFee: Number(document.getElementById('set-flat-fee').value),
+      freeShippingThreshold: Number(document.getElementById('set-free-threshold').value),
+      provinceFees
+    },
+    inventory: {
+      lowStockThreshold: Number(document.getElementById('set-low-stock').value),
+      alertThrottleHours: Number(document.getElementById('set-alert-hours').value)
+    },
+    shop: {
+      name: document.getElementById('set-shop-name').value,
+      address: document.getElementById('set-shop-address').value,
+      supportPhone: document.getElementById('set-support-phone').value,
+      ownerMobile: document.getElementById('set-owner-mobile').value.trim(),
+      taxId: document.getElementById('set-tax-id').value,
+      invoiceFooterNote: document.getElementById('set-invoice-note').value
+    }
+  };
+
+  const res = await apiFetch('/api/admin/settings', { method: 'PUT', body: JSON.stringify(payload) });
+  showToast(res.message || 'ذخیره شد.', res.success ? 'success' : 'error');
+
+  if (res.success) {
+    await recalculateCart();
+    await loadAdminDashboard();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+async function loadAuditLog() {
+  const res = await apiFetch('/api/admin/audit-log?limit=100');
+  const container = document.getElementById('admin-audit-table');
+  if (!container) return;
+
+  if (!res.success || !res.data.length) {
+    container.innerHTML = '<p class="text-slate-400">هنوز اقدام ثبت‌شده‌ای وجود ندارد.</p>';
+    return;
+  }
+
+  container.innerHTML = res.data.map(a => `
+    <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-100">
+      <div>
+        <span class="font-mono text-[11px] font-bold text-slate-800">${escapeAttr(a.action)}</span>
+        <span class="text-slate-400 mx-1">|</span>
+        <span class="text-slate-500">${escapeAttr(a.adminEmail || '—')}</span>
+        ${a.entityId ? `<span class="text-slate-400 mx-1">|</span><span class="font-mono text-[10px] text-slate-500">${escapeAttr(a.entityId)}</span>` : ''}
+      </div>
+      <span class="text-[11px] text-slate-400">${new Date(a.at).toLocaleString('fa-IR')}</span>
+    </div>
+  `).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Invoice links (admin side)
+// ---------------------------------------------------------------------------
+async function copyInvoiceLink(orderId) {
+  const res = await apiFetch(`/api/orders/${orderId}/invoice-link`);
+  if (!res.success) return showToast(res.message || 'ساخت لینک ناموفق بود.', 'error');
+
+  const url = `${window.location.origin}${res.data.url}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('لینک فاکتور کپی شد. می‌توانید برای مشتری بفرستید.', 'success');
+  } catch {
+    window.prompt('این لینک را کپی کنید:', url);
+  }
+}
+
+async function exportOrdersCsv() {
+  // A direct browser navigation keeps the auth header out of the way: the route
+  // accepts the token via query less awkwardly through fetch + blob.
+  const res = await fetch('/api/admin/orders/export.csv', {
+    headers: state.token ? { Authorization: `Bearer ${state.token}` } : {}
+  });
+
+  if (!res.ok) return showToast('خروجی اکسل ناموفق بود.', 'error');
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `manto-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast('فایل اکسل سفارش‌ها دانلود شد.', 'success');
+}
+
+// Destination province drives the shipping tariff (ADR-017): keep it in state
+// so the cart quote matches the checkout charge.
+document.getElementById('chk-province')?.addEventListener('input', (event) => {
+  state.checkoutProvince = event.target.value.trim();
+  clearTimeout(state._provinceTimer);
+  state._provinceTimer = setTimeout(() => recalculateCart(), 500);
+});
 
 // Search input debouncer
 let searchTimer = null;

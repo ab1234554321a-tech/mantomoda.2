@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Tests (7 suites) + A11y + Security Audit
+    name: Tests (8 suites) + A11y + Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

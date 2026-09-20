@@ -20,6 +20,77 @@ export const ORDER_STATUS_TRANSITIONS = {
 
 export const ORDER_STATUSES = Object.keys(ORDER_STATUS_TRANSITIONS);
 
+/**
+ * Shop-wide operational settings (ADR-017). Editable from the admin panel, so a
+ * shipping price or a low-stock threshold is a business decision, not a deploy.
+ * Shipping fees are in Toman.
+ */
+export const DEFAULT_SETTINGS = {
+  shipping: {
+    flatFee: 45000,
+    freeShippingThreshold: 2000000,
+    wholesaleAlwaysFree: true,
+    /** Per-province overrides; anything else falls back to flatFee. */
+    provinceFees: {
+      'تهران': 35000,
+      'البرز': 40000,
+      'اصفهان': 55000,
+      'فارس': 65000,
+      'خراسان رضوی': 65000,
+      'آذربایجان شرقی': 70000,
+      'گیلان': 55000,
+      'مازندران': 55000,
+      'خوزستان': 70000,
+      'سیستان و بلوچستان': 85000,
+      'هرمزگان': 85000,
+      'کردستان': 75000,
+      'کرمان': 70000,
+      'یزد': 60000,
+      'قم': 45000,
+      'مرکزی': 55000,
+      'همدان': 65000,
+      'کرمانشاه': 75000
+    }
+  },
+  inventory: {
+    /** Variants at or below this level trigger a low-stock alert. */
+    lowStockThreshold: 3,
+    /** Owner alerts are throttled to one SMS per variant per N hours. */
+    alertThrottleHours: 12
+  },
+  shop: {
+    name: 'مانتو مدا',
+    ownerMobile: '',
+    supportPhone: '',
+    address: 'تهران، ایران',
+    taxId: '',
+    invoiceFooterNote: 'از خرید شما سپاسگزاریم — مانتو مدا'
+  },
+  coupons: {
+    enabled: true,
+    /** Discount may never exceed this share of the basket (safety rail). */
+    maxDiscountShare: 0.6
+  }
+};
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/** Deep-merge stored values over the defaults so new keys appear after upgrade. */
+function mergeSettings(base, override) {
+  if (!override || typeof override !== 'object') return clone(base);
+  const merged = clone(base);
+  for (const [key, value] of Object.entries(override)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && merged[key] && typeof merged[key] === 'object') {
+      merged[key] = mergeSettings(merged[key], value);
+    } else if (value !== undefined && value !== null) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
 export function allowedTransitionsFrom(status) {
   return ORDER_STATUS_TRANSITIONS[status] || [];
 }
@@ -36,6 +107,9 @@ class DataStore {
       this.orders = snapshot.orders;
       this.payments = snapshot.payments || [];
       this.otps = snapshot.otps || [];
+      this.settings = mergeSettings(DEFAULT_SETTINGS, snapshot.settings || {});
+      this.coupons = snapshot.coupons || [];
+      this.adminActions = snapshot.adminActions || [];
       this.loadedFromSnapshot = true;
     } else {
       this.users = JSON.parse(JSON.stringify(SEED_USERS));
@@ -45,6 +119,9 @@ class DataStore {
       this.orders = JSON.parse(JSON.stringify(SEED_ORDERS));
       this.payments = [];
       this.otps = [];
+      this.settings = clone(DEFAULT_SETTINGS);
+      this.coupons = [];
+      this.adminActions = [];
       this.loadedFromSnapshot = false;
     }
 
@@ -65,7 +142,10 @@ class DataStore {
       products: this.products,
       orders: this.orders,
       payments: this.payments,
-      otps: this.otps
+      otps: this.otps,
+      settings: this.settings,
+      coupons: this.coupons,
+      adminActions: this.adminActions
     };
   }
 
@@ -86,6 +166,286 @@ class DataStore {
       snapshotFile: this.persistenceEnabled ? snapshotPath() : null,
       loadedFromSnapshot: Boolean(this.loadedFromSnapshot),
       pendingWrites: this.persistenceEnabled ? this.saver.hasPendingWrites() : false
+    };
+  }
+
+
+  // --- Shop Settings (ADR-017) ---
+  getSettings() {
+    return this.settings;
+  }
+
+  updateSettings(patch) {
+    this.settings = mergeSettings(this.settings, patch || {});
+    this.persist();
+    return this.settings;
+  }
+
+  // --- Coupons (ADR-018) ---
+  listCoupons({ includeArchived = false } = {}) {
+    return this.coupons
+      .filter(c => includeArchived || !c.isArchived)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+
+  findCouponByCode(code) {
+    if (!code) return null;
+    const normalized = String(code).trim().toUpperCase();
+    return this.coupons.find(c => c.code === normalized) || null;
+  }
+
+  createCoupon(data) {
+    const now = new Date().toISOString();
+    const coupon = {
+      id: `cpn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      code: String(data.code).trim().toUpperCase(),
+      type: data.type,                       // PERCENT | FIXED
+      value: Number(data.value),
+      minBasket: Number(data.minBasket || 0),
+      maxDiscount: data.maxDiscount ? Number(data.maxDiscount) : null,
+      appliesTo: data.appliesTo || 'ALL',    // ALL | RETAIL | WHOLESALE
+      usageLimit: data.usageLimit ? Number(data.usageLimit) : null,
+      perUserLimit: data.perUserLimit ? Number(data.perUserLimit) : null,
+      expiresAt: data.expiresAt || null,
+      isActive: data.isActive !== false,
+      isArchived: false,
+      usedCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.coupons.push(coupon);
+    this.persist();
+    return coupon;
+  }
+
+  updateCoupon(id, updates = {}) {
+    const coupon = this.coupons.find(c => c.id === id);
+    if (!coupon) return null;
+
+    const allowed = ['type', 'value', 'minBasket', 'maxDiscount', 'appliesTo', 'usageLimit', 'perUserLimit', 'expiresAt', 'isActive', 'code'];
+    for (const key of allowed) {
+      if (updates[key] === undefined) continue;
+      if (key === 'code') coupon.code = String(updates.code).trim().toUpperCase();
+      else if (key === 'type' || key === 'appliesTo') coupon[key] = updates[key];
+      else if (key === 'isActive') coupon[key] = Boolean(updates.isActive);
+      else if (key === 'expiresAt') coupon[key] = updates.expiresAt || null;
+      else coupon[key] = updates[key] === null ? null : Number(updates[key]);
+    }
+    coupon.updatedAt = new Date().toISOString();
+    this.persist();
+    return coupon;
+  }
+
+  /** Archiving keeps the redemption history of past orders intact. */
+  archiveCoupon(id) {
+    const coupon = this.coupons.find(c => c.id === id);
+    if (!coupon) return null;
+    coupon.isArchived = true;
+    coupon.isActive = false;
+    coupon.updatedAt = new Date().toISOString();
+    this.persist();
+    return coupon;
+  }
+
+  /** Called when an order that used the coupon is actually created. */
+  registerCouponUsage(code) {
+    const coupon = this.findCouponByCode(code);
+    if (!coupon) return null;
+    coupon.usedCount = (coupon.usedCount || 0) + 1;
+    coupon.lastUsedAt = new Date().toISOString();
+    this.persist();
+    return coupon;
+  }
+
+  countUserCouponUsage(userId, code) {
+    const normalized = String(code || '').trim().toUpperCase();
+    if (!normalized) return 0;
+    return this.orders.filter(o => o.userId === userId && o.status !== 'CANCELLED' && o.couponCode === normalized).length;
+  }
+
+  // --- Admin audit log (ADR-020) ---
+  recordAdminAction({ adminId, adminEmail, action, entity, entityId, details, ip }) {
+    const entry = {
+      id: `act-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      at: new Date().toISOString(),
+      adminId: adminId || null,
+      adminEmail: adminEmail || null,
+      action,
+      entity: entity || null,
+      entityId: entityId || null,
+      details: details || null,
+      ip: ip || null
+    };
+    this.adminActions.unshift(entry);
+    // Bound the log so a long-running shop cannot grow it without limit.
+    if (this.adminActions.length > 2000) this.adminActions.length = 2000;
+    this.persist();
+    return entry;
+  }
+
+  listAdminActions({ limit = 100, entity, adminId } = {}) {
+    return this.adminActions
+      .filter(a => (entity ? a.entity === entity : true))
+      .filter(a => (adminId ? a.adminId === adminId : true))
+      .slice(0, Math.min(Number(limit) || 100, 500));
+  }
+
+  // --- Inventory bulk operations (Phase 10) ---
+  /** Returns the updated variants plus any that are now at/below the threshold. */
+  setVariantStock(productId, variantId, stock) {
+    const product = this.findProductById(productId);
+    if (!product) return null;
+    const variant = (product.variants || []).find(v => v.id === variantId);
+    if (!variant) return null;
+    variant.stock = Math.max(0, Math.floor(Number(stock)));
+    product.updatedAt = new Date().toISOString();
+    this.persist();
+    return { product, variant };
+  }
+
+  listLowStockVariants(threshold) {
+    const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : this.settings.inventory.lowStockThreshold;
+    const low = [];
+    for (const product of this.products) {
+      if (product.isActive === false) continue;
+      for (const variant of product.variants || []) {
+        if (Number(variant.stock) <= limit) {
+          low.push({
+            productId: product.id,
+            productTitle: product.title,
+            variantId: variant.id,
+            color: variant.color,
+            size: variant.size,
+            stock: Number(variant.stock),
+            threshold: limit
+          });
+        }
+      }
+    }
+    return low.sort((a, b) => a.stock - b.stock);
+  }
+
+  /**
+   * Low-stock alerts must not spam the owner: one SMS per variant per throttle
+   * window (ADR-019). Returns only the variants that should be alerted now.
+   */
+  takeAlertableLowStock(threshold, throttleHours) {
+    const now = Date.now();
+    const windowMs = Math.max(1, Number(throttleHours) || 12) * 3600 * 1000;
+    const due = [];
+
+    for (const item of this.listLowStockVariants(threshold)) {
+      const product = this.findProductById(item.productId);
+      const variant = (product?.variants || []).find(v => v.id === item.variantId);
+      if (!variant) continue;
+      const last = variant.lowStockAlertAt ? new Date(variant.lowStockAlertAt).getTime() : 0;
+      if (now - last < windowMs) continue;
+      variant.lowStockAlertAt = new Date(now).toISOString();
+      due.push(item);
+    }
+
+    if (due.length > 0) this.persist();
+    return due;
+  }
+
+  // --- Analytics helpers (ADR-020) ---
+  /** Revenue counts only orders that were paid for or delivered, never cancelled ones. */
+  revenueSummary({ now = new Date() } = {}) {
+    const paidStatuses = ['CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+    const isBillable = (order) => order.paymentStatus === 'PAID' || paidStatuses.includes(order.status);
+    const billable = this.orders.filter(isBillable);
+
+    // Iran has no DST: a fixed +03:30 offset is stable and avoids a tz dependency.
+    const tehran = (date) => new Date(new Date(date).getTime() + (3 * 60 + 30) * 60 * 1000);
+    const dayKey = (date) => tehran(date).toISOString().slice(0, 10);
+    const monthKey = (date) => tehran(date).toISOString().slice(0, 7);
+
+    const today = dayKey(now);
+    const month = monthKey(now);
+
+    const sum = (list) => list.reduce((acc, o) => acc + (o.payableAmount || 0), 0);
+
+    const productTotals = new Map();
+    for (const order of billable) {
+      for (const item of order.items || []) {
+        const key = item.productId || item.productTitle;
+        const current = productTotals.get(key) || { productId: item.productId, title: item.productTitle, quantity: 0, revenue: 0 };
+        current.quantity += Number(item.quantity) || 0;
+        current.revenue += (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+        productTotals.set(key, current);
+      }
+    }
+
+    // Revenue is recognised on payment, not on order creation. The dashboard
+    // therefore also reports today's not-yet-paid orders separately, so the
+    // owner never mistakes "orders taken" for "money in".
+    const todaysOrders = this.orders.filter(o => dayKey(o.createdAt) === today);
+    const pendingToday = todaysOrders.filter(o => !isBillable(o));
+
+    return {
+      revenueToday: sum(billable.filter(o => dayKey(o.createdAt) === today)),
+      pendingRevenueToday: sum(pendingToday),
+      pendingOrdersToday: pendingToday.length,
+      revenueThisMonth: sum(billable.filter(o => monthKey(o.createdAt) === month)),
+      revenueAllTime: sum(billable),
+      ordersToday: this.orders.filter(o => dayKey(o.createdAt) === today).length,
+      ordersThisMonth: this.orders.filter(o => monthKey(o.createdAt) === month).length,
+      billableOrders: billable.length,
+      cancelledOrders: this.orders.filter(o => o.status === 'CANCELLED').length,
+      awaitingPayment: this.orders.filter(o => o.status === 'PENDING' && o.paymentStatus !== 'PAID').length,
+      averageOrderValue: billable.length ? Math.round(sum(billable) / billable.length) : 0,
+      topProducts: [...productTotals.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 5)
+    };
+  }
+
+  // --- Order search / export (Phase 10) ---
+  searchOrders({ status, paymentStatus, orderType, search, from, to, page = 1, limit = 100 } = {}) {
+    const term = String(search || '').trim().toLowerCase();
+
+    let list = this.orders.filter(order => {
+      if (status && order.status !== status) return false;
+      if (paymentStatus && (order.paymentStatus || 'PENDING') !== paymentStatus) return false;
+      if (orderType && order.orderType !== orderType) return false;
+      if (from && new Date(order.createdAt) < new Date(from)) return false;
+      if (to) {
+        // `to` is inclusive: compare against the end of that day.
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (new Date(order.createdAt) > end) return false;
+      }
+      if (!term) return true;
+
+      const haystack = [
+        order.orderNumber,
+        order.userFullName,
+        order.userEmail,
+        order.userPhone,
+        order.shippingAddress?.phone,
+        order.shippingAddress?.recipientName,
+        order.shippingAddress?.city,
+        order.shippingAddress?.province,
+        order.couponCode
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      return haystack.includes(term);
+    });
+
+    list = list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 100), 500);
+    const safePage = Math.max(1, Number(page) || 1);
+    const total = list.length;
+    const start = (safePage - 1) * safeLimit;
+
+    return {
+      items: list.slice(start, start + safeLimit),
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+        hasMore: start + safeLimit < total
+      }
     };
   }
 
@@ -295,9 +655,11 @@ class DataStore {
     return this.categories;
   }
 
-  listProducts({ category, search, season, minPrice, maxPrice, page, limit } = {}) {
+  listProducts({ category, search, season, minPrice, maxPrice, page, limit, includeArchived = false } = {}) {
     const filtered = this.products.filter(p => {
-      if (!p.isActive) return false;
+      // The storefront only sees active, non-archived products; the admin panel
+      // asks with includeArchived=true and sees everything.
+      if (!includeArchived && (!p.isActive || p.isArchived)) return false;
       if (category && p.categoryId !== category && p.category !== category) return false;
       if (season && p.season !== season && p.season !== 'چهار فصل') return false;
       if (minPrice && p.retailPrice < Number(minPrice)) return false;
@@ -335,38 +697,114 @@ class DataStore {
     return this.products.find(p => p.id === id || p.slug === id) || null;
   }
 
-  createProduct(productData) {
+  /**
+   * Creates a product from an already-normalised payload (see
+   * services/catalog/product.service.js). Only whitelisted fields are copied:
+   * an admin request can never inject `id`, `rating` or arbitrary keys.
+   */
+  createProduct(product) {
+    const now = new Date().toISOString();
     const newProduct = {
-      id: `prod-${Date.now().toString().slice(-4)}`,
-      sku: productData.sku || `MM-PROD-${Date.now().toString().slice(-4)}`,
-      title: productData.title,
-      slug: productData.slug || `manto-${Date.now().toString().slice(-4)}`,
-      category: productData.category || 'مانتو کتی و اداری',
-      categoryId: productData.categoryId || 'cat-formal',
-      material: productData.material || 'کرپ درجه یک',
-      season: productData.season || 'چهار فصل',
-      description: productData.description || '',
-      retailPrice: Number(productData.retailPrice) || 0,
-      wholesalePrice: Number(productData.wholesalePrice) || 0,
-      wholesaleMinQuantity: Number(productData.wholesaleMinQuantity) || 6,
-      isFeatured: Boolean(productData.isFeatured),
-      isActive: true,
-      rating: 5.0,
+      id: product.id || `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      sku: product.sku,
+      slug: product.slug,
+      title: product.title,
+      category: product.category,
+      categoryId: product.categoryId || db.categories.find(c => c.name === product.category)?.id || 'cat-formal',
+      material: product.material || '',
+      season: product.season || 'چهار فصل',
+      description: product.description || '',
+      retailPrice: Math.round(Number(product.retailPrice)),
+      wholesalePrice: Math.round(Number(product.wholesalePrice) || 0),
+      wholesaleMinQuantity: Math.floor(Number(product.wholesaleMinQuantity) || 6),
+      isFeatured: Boolean(product.isFeatured),
+      isActive: product.isActive !== false,
+      isArchived: false,
+      rating: 5,
       reviewsCount: 0,
-      images: productData.images && productData.images.length > 0 ? productData.images : ["https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=80"],
-      variants: productData.variants || [
-        { id: `var-${Date.now()}-1`, color: 'مشکی', colorHex: '#000000', size: '40', stock: 20, sku: `${productData.sku || 'SKU'}-BLK-40` }
-      ]
+      images: product.images || [],
+      imageThumbnails: product.imageThumbnails || [],
+      variants: product.variants || [],
+      createdAt: now,
+      updatedAt: now
     };
+
     this.products.unshift(newProduct);
     this.persist();
     return newProduct;
   }
 
-  updateProduct(id, updates) {
+  /**
+   * Updates only the fields an admin is allowed to change. `id`, `variants`
+   * stock and statistics are never blindly overwritten from the request body.
+   */
+  updateProduct(id, updates = {}) {
     const product = this.findProductById(id);
     if (!product) return null;
-    Object.assign(product, updates);
+
+    const allowed = [
+      'title', 'slug', 'sku', 'category', 'categoryId', 'material', 'season', 'description',
+      'retailPrice', 'wholesalePrice', 'wholesaleMinQuantity', 'isFeatured', 'isActive', 'images'
+    ];
+
+    for (const key of allowed) {
+      if (updates[key] === undefined) continue;
+      if (key === 'retailPrice' || key === 'wholesalePrice') product[key] = Math.round(Number(updates[key]));
+      else if (key === 'wholesaleMinQuantity') product[key] = Math.floor(Number(updates[key]));
+      else if (key === 'isFeatured' || key === 'isActive') product[key] = Boolean(updates[key]);
+      else if (key === 'images') product[key] = (updates.images || []).slice(0, 8);
+      else product[key] = updates[key];
+    }
+
+    if (Array.isArray(updates.variants)) {
+      // Merging by id preserves stock history for variants that already existed.
+      for (const incoming of updates.variants) {
+        const existing = (product.variants || []).find(v => v.id === incoming.id);
+        if (existing) {
+          if (incoming.color !== undefined) existing.color = incoming.color;
+          if (incoming.colorHex !== undefined) existing.colorHex = incoming.colorHex;
+          if (incoming.size !== undefined) existing.size = incoming.size;
+          if (incoming.stock !== undefined) existing.stock = Math.max(0, Math.floor(Number(incoming.stock)));
+          if (incoming.sku !== undefined) existing.sku = incoming.sku;
+        }
+      }
+      const incomingIds = new Set(updates.variants.map(v => v.id).filter(Boolean));
+      // Variants the admin removed are dropped, but only if they hold no stock
+      // that was already sold — otherwise those sales would reference a ghost.
+      product.variants = [
+        ...(product.variants || []).filter(v => incomingIds.has(v.id) || !incomingIds.size),
+        ...updates.variants.filter(v => !v.id || !(product.variants || []).some(existing => existing.id === v.id))
+      ];
+    }
+
+    product.updatedAt = new Date().toISOString();
+    this.persist();
+    return product;
+  }
+
+  /**
+   * Archiving instead of deleting: past orders point at this product, and the
+   * financial history must stay readable. Archived products disappear from the
+   * storefront but remain visible to the admin.
+   */
+  archiveProduct(id, { archivedBy = null } = {}) {
+    const product = this.findProductById(id);
+    if (!product) return null;
+    product.isArchived = true;
+    product.isActive = false;
+    product.archivedAt = new Date().toISOString();
+    product.archivedBy = archivedBy;
+    product.updatedAt = product.archivedAt;
+    this.persist();
+    return product;
+  }
+
+  restoreProduct(id) {
+    const product = this.findProductById(id);
+    if (!product) return null;
+    product.isArchived = false;
+    product.isActive = true;
+    product.updatedAt = new Date().toISOString();
     this.persist();
     return product;
   }
@@ -514,7 +952,11 @@ class DataStore {
       items: orderData.items,
       totalAmount: orderData.totalAmount,
       discountAmount: orderData.discountAmount || 0,
+      // Coupon redemption is part of the financial record, not a UI detail:
+      // accounting needs to know which promotion produced this revenue.
+      couponCode: orderData.couponCode || null,
       shippingFee: orderData.shippingFee || 0,
+      shippingSource: orderData.shippingSource || null,
       payableAmount: orderData.payableAmount,
       // Online checkout starts UNPAID: the order is only marked PAID after the
       // PSP verifies the transaction (ADR-008). Bank-transfer receipts stay

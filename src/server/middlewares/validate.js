@@ -37,6 +37,10 @@ export const orderCheckoutSchema = z.object({
     fullAddress: z.string().min(5, 'آدرس پستی الزامی است').max(500),
     postalCode: z.string().max(20).optional()
   }),
+  // Zod strips unknown keys, so every field the checkout consumes must be
+  // declared here — otherwise a coupon code silently disappears (found by the
+  // Level-8 commerce tests).
+  couponCode: z.string().trim().max(30, 'کد تخفیف نامعتبر است').optional(),
   paymentMethod: z.enum(['ONLINE_GATEWAY', 'BANK_TRANSFER_RECEIPT']).default('ONLINE_GATEWAY')
 });
 

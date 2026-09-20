@@ -22,6 +22,8 @@ import orderRoutes from './routes/order.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import seoRoutes from './routes/seo.routes.js';
+import invoiceRoutes, { publicInvoiceRouter } from './routes/invoice.routes.js';
+import { auditAdminWrite } from './middlewares/admin-audit.js';
 import uploadRoutes from './routes/upload.routes.js';
 import { uploadsDir } from './db/persistence.js';
 import { db } from './db/store.js';
@@ -140,8 +142,10 @@ export function createApp() {
   app.use('/api/cart', generalApiLimiter, cartRoutes);
   app.use('/api/orders', generalApiLimiter, orderRoutes);
   app.use('/api/payments', generalApiLimiter, paymentRoutes);
-  app.use('/api/admin', generalApiLimiter, adminRoutes);
-  app.use('/api/admin', generalApiLimiter, uploadRoutes);
+  // Every mutating admin request is audited (ADR-020) before it hits a route.
+  app.use('/api/admin', generalApiLimiter, auditAdminWrite, adminRoutes);
+  app.use('/api/admin', generalApiLimiter, auditAdminWrite, uploadRoutes);
+  app.use('/api', generalApiLimiter, invoiceRoutes);
 
   // 9. Uploaded product images (content-addressed files on disk)
   app.use('/uploads', express.static(uploadsDir(), {
@@ -153,6 +157,9 @@ export function createApp() {
 
   // 10. SEO: robots.txt, sitemap.xml and the pre-rendered product page
   app.use('/', seoRoutes);
+
+  // 10.b Signed, printable invoice page (no login needed, expiring link)
+  app.use('/', publicInvoiceRouter);
 
   // 11. Serve Client Static Files
   app.use(express.static(publicPath));

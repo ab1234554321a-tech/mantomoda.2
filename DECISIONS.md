@@ -276,3 +276,89 @@ This log contains the record of all major architectural and technical decisions 
   - `lang="fa"` + `dir="rtl"` and a zoom-friendly viewport.
 - **Consequences**: The audit script is a regression gate (17 checks today). It cannot detect
   contrast or screen-reader flow, so a manual pass remains on the pre-launch checklist.
+
+---
+
+## ADR-017: Centralised Pricing Policy (shipping + totals in one module)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: The shipping rule (`subtotal > 2000000 || isWholesale ? 0 : 45000`) existed as two
+  independent copies — `cart.routes.js` and `order.routes.js`. Two copies of a pricing rule are a
+  guaranteed future bug: the cart quotes one number and the checkout charges another, which is exactly
+  the kind of discrepancy that ends in a chargeback. Tariffs were also hard-coded, so changing a
+  shipping price required a developer and a deploy.
+- **Decision**: `src/server/services/pricing/shipping.service.js` owns all shipping and total maths,
+  driven by admin-editable settings (`db.getSettings().shipping`): a flat default fee, per-province
+  tariffs, a free-shipping threshold and free shipping for verified wholesale partners. `calculateOrderTotals`
+  returns `subtotal → discount → net → shipping → payable` and is the only place that adds them up.
+  Both the cart and the checkout call it, so they cannot disagree.
+- **Consequences**: The owner changes a tariff in the panel and the change is live everywhere
+  immediately. The quote carries its reason (`source`/`description`) so the customer sees *why* a fee
+  applies. Ceiling: the tariff is per province, not per weight or per carrier (documented in BACKLOG).
+
+---
+
+## ADR-018: Server-Side Coupon Engine and Product Validation
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `discountAmount` existed on orders but nothing ever wrote to it — there was no way to
+  run a promotion. At the same time the admin product endpoint validated only "has a title and a
+  price", so a negative price, a non-numeric stock or a duplicated SKU could be stored and would then
+  corrupt pricing and inventory — and a `PUT` could overwrite `id`, `rating` or any other field.
+- **Decision**:
+  - `services/pricing/coupon.service.js` evaluates a code against the stored basket and the user:
+    type (percent/fixed), minimum basket, maximum discount, per-customer and total usage limits,
+    expiry, channel (retail/wholesale) and an enabled switch. Every rejection returns a specific
+    reason code, and the checkout answers **422 `COUPON_REJECTED`** rather than silently charging the
+    full price.
+  - Safety rails: a discount can never exceed the basket, nor more than `maxDiscountShare` of it, and
+    percent coupons are capped at 90% at creation time.
+  - `services/catalog/product.service.js` validates with Zod, normalises toman integers, generates a
+    unique slug and a **Latin-only warehouse SKU** (Persian titles are transliterated, with a
+    deterministic code as fallback), rejects duplicate colour+size variants and a wholesale price that
+    is not below the retail price, and whitelists the fields `updateProduct` may touch.
+  - A product is **archived, never deleted**: past orders reference it, so deletion would break the
+    financial record. Archived products vanish from the storefront, stay visible to the admin and can
+    be restored; a slug stays stable across title edits because it is already shared as a public URL.
+- **Consequences**: Promotions are a business tool the owner can run alone, and the catalog cannot be
+  corrupted through the API. Coupon usage is counted at order creation and recorded on the order for
+  accounting.
+
+---
+
+## ADR-019: Low-Stock Alerts to the Shop Owner
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: Inventory integrity (ADR-011) stops overselling, but a shop that never restocks still
+  loses sales. The owner has no dashboard habit yet; an SMS is the channel that actually reaches them.
+- **Decision**: After a sale (and on demand from the panel) `services/inventory-alert.service.js`
+  checks variants at or below `settings.inventory.lowStockThreshold` and sends the owner one Persian
+  SMS per throttle window (`alertThrottleHours`, default 12h) per variant — so a busy day cannot become
+  an SMS storm. A missing owner mobile disables alerts instead of erroring, and a failing gateway can
+  never block a checkout or an inventory edit.
+- **Consequences**: Restocking becomes a phone notification instead of a manual count, and the
+  dashboard shows the same list for review.
+
+---
+
+## ADR-020: Admin Audit Trail, Order Search/Export and Signed Invoice Links
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: With several people (and AI agents) able to change prices, stock and order states, "who
+  changed this?" had no answer. Accounting also asked for a spreadsheet, and customers asked for an
+  invoice they could forward to their accountant.
+- **Decision**:
+  - `middlewares/admin-audit.js` records every successful mutating admin request (who, when, action,
+    entity, IP, and a redacted body) into `db.adminActions`, bounded to the newest 2000 entries and
+    readable through `GET /api/admin/audit-log`. Rejected requests are not logged (nothing changed),
+    and password/token fields are never written.
+  - `GET /api/admin/orders` accepts search (order number, customer, mobile, city, coupon), status,
+    payment status, type and date range with pagination; `GET /api/admin/orders/export.csv` returns a
+    UTF-8 **BOM** CSV with CRLF and Persian headers, which Excel opens correctly — the detail that
+    makes the export actually usable.
+  - Invoice delivery uses a **signed, expiring link** (HMAC over `orderNumber:expiry`, default 30 days)
+    instead of a login wall or a public URL: a customer can forward it, an attacker cannot guess it,
+    and an expired link answers 410. The rendered invoice is `noindex` and totals are read from the
+    stored order only.
+- **Consequences**: Every price/stock/status change has an owner, accounting is a two-click download,
+  and invoices are shareable without exposing other customers' data.

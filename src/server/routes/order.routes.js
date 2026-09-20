@@ -1,3 +1,6 @@
+import { calculateOrderTotals } from '../services/pricing/shipping.service.js';
+import { evaluateCoupon } from '../services/pricing/coupon.service.js';
+import { checkLowStockAfterSale } from '../services/inventory-alert.service.js';
 import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
@@ -8,7 +11,7 @@ const router = Router();
 
 // Create Order (Checkout) with Server-Side Recalculation & Schema Validation
 router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
-  const { items, shippingAddress, paymentMethod } = req.body;
+  const { items, shippingAddress, paymentMethod, couponCode } = req.body;
 
   const isWholesaleUser = req.user.role === 'ADMIN' || (req.user.role === 'WHOLESALE' && req.user.isWholesaleVerified === true);
 
@@ -64,8 +67,34 @@ router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
     });
   }
 
-  const shippingFee = subtotal > 2000000 || isWholesaleUser ? 0 : 45000;
-  const payableAmount = subtotal + shippingFee;
+  // --- Discount + shipping + payable, all server-side (ADR-017 / ADR-018) ---
+  // The client may have shown a preview, but the numbers that matter are the
+  // ones computed here from the stored basket.
+  let couponResult = null;
+  if (couponCode) {
+    couponResult = evaluateCoupon({
+      code: couponCode,
+      subtotal,
+      user: req.user,
+      orderType: hasWholesaleItem ? 'WHOLESALE' : 'RETAIL'
+    });
+
+    if (!couponResult.ok && couponResult.reason !== 'ZERO_DISCOUNT') {
+      return res.status(422).json({
+        success: false,
+        error: 'COUPON_REJECTED',
+        message: couponResult.message,
+        reason: couponResult.reason
+      });
+    }
+  }
+
+  const totals = calculateOrderTotals({
+    subtotal,
+    discount: couponResult?.ok ? couponResult.discount : 0,
+    province: shippingAddress?.province || '',
+    isWholesale: isWholesaleUser
+  });
 
   // --- Atomic reservation (ADR-011) ---
   // The cart stock check above is advisory; this is the authoritative lock.
@@ -89,16 +118,28 @@ router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
     orderType: hasWholesaleItem ? 'WHOLESALE' : 'RETAIL',
     items: orderItems,
     totalAmount: subtotal,
-    discountAmount: 0,
-    shippingFee,
-    payableAmount,
+    discountAmount: totals.discountAmount,
+    couponCode: couponResult?.ok ? couponResult.code : null,
+    shippingFee: totals.shippingFee,
+    shippingSource: totals.shipping.source,
+    payableAmount: totals.payableAmount,
     paymentMethod: paymentMethod || 'ONLINE_GATEWAY',
     stockReserved: true,
     shippingAddress
   });
 
+  // A successful checkout finally burns one unit of the coupon's capacity.
+  if (couponResult?.ok) {
+    db.registerCouponUsage(couponResult.code);
+    order.couponCode = couponResult.code;
+    order.discountAmount = totals.discountAmount;
+  }
+
   // Order-received SMS (ADR-012). Never blocks or fails the checkout.
   notifyOrderPlaced(order);
+
+  // Post-sale inventory alert to the owner (ADR-019) — fire and forget.
+  checkLowStockAfterSale(order.items).catch(() => { /* logged inside */ });
 
   res.status(201).json({
     success: true,

@@ -1,3 +1,5 @@
+import { calculateOrderTotals, describeShipping } from '../services/pricing/shipping.service.js';
+import { previewCoupon } from '../services/pricing/coupon.service.js';
 import { Router } from 'express';
 import { db } from '../db/store.js';
 
@@ -5,7 +7,7 @@ const router = Router();
 
 // Calculate cart totals with strict backend price validation & wholesale rules
 router.post('/calculate', (req, res) => {
-  const { items } = req.body; // array of { productId, variantId, quantity }
+  const { items, couponCode, shippingAddress } = req.body; // array of { productId, variantId, quantity }
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.json({
@@ -112,8 +114,16 @@ router.post('/calculate', (req, res) => {
     });
   }
 
-  const shippingFee = subtotal > 2000000 || isWholesaleUser ? 0 : 45000;
-  const payableAmount = subtotal + shippingFee;
+  // --- Coupon preview (ADR-018). Advisory only: checkout recomputes it. -----
+  const couponResult = couponCode ? previewCoupon({ code: couponCode, subtotal, user: req.user }) : null;
+
+  // --- Totals from the single pricing source (ADR-017) ---------------------
+  const totals = calculateOrderTotals({
+    subtotal,
+    discount: couponResult?.ok ? couponResult.discount : 0,
+    province: shippingAddress?.province || req.body.province || '',
+    isWholesale: isWholesaleUser
+  });
 
   res.json({
     success: true,
@@ -122,8 +132,18 @@ router.post('/calculate', (req, res) => {
       itemsCount: totalQuantity,
       subtotal,
       totalSavings,
-      shippingFee,
-      payableAmount,
+      discountAmount: totals.discountAmount,
+      coupon: couponResult
+        ? { code: couponCode, applied: couponResult.ok, discount: couponResult.discount || 0, message: couponResult.message }
+        : null,
+      shippingFee: totals.shippingFee,
+      shipping: {
+        isFree: totals.shipping.isFree,
+        reason: totals.shipping.reason,
+        description: describeShipping(totals.shipping)
+      },
+      payableAmount: totals.payableAmount,
+      freeShippingThreshold: totals.shipping.threshold,
       isWholesaleOrder: isWholesaleUser && processedItems.some(i => i.isWholesalePriceApplied),
       wholesaleNotices,
       stockNotices,

@@ -6,6 +6,7 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 10: Back-Office & Commerce** — shop settings, centralised pricing, coupons, product management with archive, inventory operations with owner alerts, order search/CSV export, signed printable invoices, admin dashboard and audit trail (ADR-017..020). 8 test suites green.
 - [x] **Phase 9.5: Revenue-Readiness Hardening** — all 12 items of `EXECUTION_PLAN.md` (persistence, inventory integrity, order state machine + audit trail, SMS notifications, process hardening, supertest HTTP tests, pagination, image upload, SEO, accessibility, backups, docs/release). ADR-010..016.
 
 - [x] **Phase 1 & 2: Repository Audit & Governance Setup**
@@ -73,20 +74,19 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 2. In Progress (در حال اجرا)
 
-- [x] **Phase 9.5: Revenue-Readiness Hardening (`EXECUTION_PLAN.md`, 12 items) — COMPLETE**
-  - [x] **Persistence (ADR-010)**: atomic debounced JSON snapshot (`src/server/db/persistence.js`), flush on shutdown, disabled under `NODE_ENV=test`/`PERSIST_DATA=false`, `RESET_DATA` re-seed, OTP records never restored. Verified across a real process restart.
-  - [x] **Inventory integrity (ADR-011)**: `db.checkStock`/`db.reserveStock`/`db.releaseStock`; `POST /api/orders` returns 409 `INSUFFICIENT_STOCK` with per-line availability; cancellation restores stock; cart warns before checkout.
-  - [x] **Order state machine (ADR-011)**: explicit transition map, 409 `INVALID_STATUS_TRANSITION` listing the legal next steps, `order.statusHistory[]` audit trail; the admin UI mirrors the map and shows the history.
-  - [x] **Order SMS notifications (ADR-012)**: placement, payment and status-change messages through the pluggable provider; failures recorded in `order.notifications[]` and never block the operation.
-  - [x] **Process hardening**: `app.js`/`index.js` split, graceful shutdown with data flush, `unhandledRejection` logging, `uncaughtException` flush + non-zero exit, OTP sweeper interval.
-  - [x] **Real HTTP tests**: `supertest` Level 7 suite (`tests/operations.test.js`) — 7 suites total in `npm test`.
-  - [x] **Pagination (ADR-014)**: `page`/`limit` with `meta.hasMore`, default 12 / cap 60, "show more" control in the storefront.
-  - [x] **Image upload (ADR-013)**: admin-only multipart upload, content sniffing, WebP re-encode, thumbnails, safe delete, `/uploads` static serving.
-  - [x] **SEO (ADR-015)**: `robots.txt`, data-driven `sitemap.xml`, pre-rendered `/product/:slug` with OG/Twitter tags, Product JSON-LD and `<noscript>`; product cards are real links.
-  - [x] **Accessibility (ADR-016)**: labels, alt text, dialog semantics, live regions, skip link, focus rings, reduced motion; `npm run a11y` (17 checks) enforced in CI.
-  - [x] **Backups**: `scripts/backup.sh` + `npm run backup` — create, verify, rotate, list, restore (tested).
-  - [x] **Docs + release**: ADR-010..016, ARCHITECTURE §12, CHANGELOG, this tracker, `project-state.json`, distribution archive rebuilt.
-
+- [x] **Phase 10: Back-Office & Commerce (PHASE-10-PLAN.md, 11 items) — COMPLETE**
+  - [x] **Shop settings (ADR-017)**: shipping tariffs per province, free-shipping threshold, wholesale free shipping, low-stock threshold, owner mobile, invoice identity — all editable in the panel.
+  - [x] **Centralised pricing (ADR-017)**: `services/pricing/shipping.service.js` replaces the duplicated rule that existed in `cart.routes.js` and `order.routes.js`.
+  - [x] **Coupon engine (ADR-018)**: percent/fixed, minimum basket, cap, usage/per-user limits, expiry, retail/wholesale channel; server-side re-evaluation at checkout with 422 + reason code.
+  - [x] **Product validation + identifiers (ADR-018)**: Zod schemas, toman integers, unique slug, Latin-only warehouse SKU, duplicate variant and wholesale-price checks; field whitelist on update.
+  - [x] **Archive instead of delete (ADR-018)**: products are removed from sale without breaking order history; restore supported; slugs stay stable across title edits.
+  - [x] **Admin product panel**: create/edit form with variant editor, image upload, archive/restore, filter by active/archived.
+  - [x] **Inventory operations (ADR-019)**: bulk stock edit screen, low-stock list, throttled owner SMS alert that never blocks a sale.
+  - [x] **Order operations**: search (number, customer, mobile, city, coupon), status/payment/date filters, pagination, CSV export with UTF-8 BOM for Excel.
+  - [x] **Invoice (ADR-020)**: owner-only JSON invoice + signed 30-day printable link (noindex, tamper/expiry verified).
+  - [x] **Dashboard (ADR-020)**: recognised revenue today/month/all-time, average order value, awaiting-payment, best sellers, critical stock.
+  - [x] **Audit trail (ADR-020)**: every successful admin change recorded with actor/action/entity/IP, secrets redacted, admin-only.
+  - [x] **Tests**: Level 8 suite (`tests/commerce.test.js`) — 8 suites total; `npm run a11y` green.
 ---
 
 ## 3. Planned (برنامه‌ریزی شده)

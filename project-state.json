@@ -3,9 +3,9 @@
   "version": "0.3.0-rc1",
   "lastUpdated": "2026-09-20",
   "activeBranch": "main",
-  "currentPhase": "Phase 9.5 — Revenue-readiness hardening (COMPLETE)",
-  "overallProgressPercent": 96,
-  "healthScore": 94.4,
+  "currentPhase": "Phase 10 — Back-Office & Commerce (COMPLETE)",
+  "overallProgressPercent": 98,
+  "healthScore": 94,
   "completed": [
     "Git repository initialization & Source of Truth governance",
     "Master Roadmap (ROADMAP.md) and 12-Agent Ecosystem (agents/01 to agents/12)",
@@ -45,7 +45,17 @@
     "Phase 9.5 / P1: SEO — robots.txt, data-driven sitemap.xml, pre-rendered product pages with OG + Product JSON-LD (ADR-015)",
     "Phase 9.5 / P1: Accessibility baseline enforced by npm run a11y (17 checks) in CI (ADR-016)",
     "Phase 9.5 / P2: Backup/restore script with integrity verification and rotation; process-level safety nets; app/index split enabling real HTTP tests",
-    "Phase 9.5: Test suite Level 7 (supertest) — inventory, lifecycle, notifications, pagination, SEO, uploads, persistence isolation"
+    "Phase 9.5: Test suite Level 7 (supertest) — inventory, lifecycle, notifications, pagination, SEO, uploads, persistence isolation",
+    "Phase 10: Centralised pricing policy — one shipping/totals implementation (ADR-017)",
+    "Phase 10: Coupon engine with server-side validation and usage limits (ADR-018)",
+    "Phase 10: Product management — validation, unique slug, Latin SKU, variants, archive/restore (ADR-018)",
+    "Phase 10: Inventory operations with throttled low-stock SMS alerts to the owner (ADR-019)",
+    "Phase 10: Order search, filters, pagination and accounting CSV export",
+    "Phase 10: Signed printable invoices with expiring links (ADR-020)",
+    "Phase 10: Admin dashboard with recognised revenue, best sellers and critical stock",
+    "Phase 10: Admin audit trail — who changed what, when, from where (ADR-020)",
+    "Phase 10: Admin panel UI — 7 tabs, product form, inventory quick-edit, coupon manager, settings editor",
+    "Phase 10: Test suite Level 8 (commerce) — 8 suites green"
   ],
   "inProgress": [],
   "blocked": [],
@@ -77,11 +87,12 @@
       "mitigation": "Adapter isolates the call; template name is configuration, not code"
     }
   ],
-  "nextRecommendedStep": "Phase 10: go-live checklist — set PERSIST_DATA=true + credentials on the host, schedule scripts/backup.sh, then run the 10-point ready-to-sell DoD in IMPROVEMENT_PLAN.md",
+  "nextRecommendedStep": "Phase 11 options: (a) activate the live gateway/SMS credentials and run a real end-to-end purchase, (b) reporting/exports for wholesale partners, (c) move the storefront to a build step (TD-005) if SEO volume justifies it",
   "humanDecisionsRequired": [
-    "Provide ZARINPAL_MERCHANT_ID (and KAVENEGAR_API_KEY + approved sender/pattern) when payment activation is resumed",
-    "Confirm the production host and that its disk (or a mounted volume) is used for DATA_DIR and UPLOAD_DIR",
-    "Confirm PUBLIC_SITE_URL (the real domain) for canonical URLs and sitemap entries"
+    "Enter the real shipping tariff (the seeded per-province numbers are placeholders)",
+    "Set the owner mobile in the panel so low-stock alerts are actually delivered",
+    "Provide ZARINPAL_MERCHANT_ID (and KAVENEGAR_API_KEY + approved sender) when payment activation is resumed",
+    "Confirm PUBLIC_SITE_URL for canonical URLs and sitemap entries"
   ],
   "aiToolchain": {
     "skillsSource": "github.com/erichowens/some_claude_skills (MIT)",

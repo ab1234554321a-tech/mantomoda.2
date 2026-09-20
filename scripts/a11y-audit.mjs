@@ -94,16 +94,30 @@ if (unlabelled.length > 0) {
   failures.push(`  ↳ unlabelled controls: ${unlabelled.map((t) => t.slice(0, 60)).join(' | ')}`);
 }
 
+// Count how a field gets its name, so the check reflects reality rather than
+// assuming every label must be a `label[for]` (a wrapping <label> is just as valid).
 const idsInFields = fieldTags
   .map((t) => (t.match(/\bid="([^"]+)"/) || [])[1])
-  .filter((id) => id && !/^upload-/.test(id));
+  .filter(Boolean);
+
 const labelsFor = [...html.matchAll(/<label[^>]*\bfor="([^"]+)"/g)].map((m) => m[1]);
-const ariaLabels = fieldTags.filter((t) => /\baria-label=/.test(t)).length;
+const ariaLabels = fieldTags.filter((t) => /\baria-label=|\baria-labelledby=/.test(t)).length;
+const wrappedControls = fieldTags.filter((tag) => isWrappedInLabel(tag)).length;
+
+const unlabelledById = idsInFields.filter((id) => {
+  if (labelsFor.includes(id)) return false;                     // explicit <label for>
+  const tag = fieldTags.find((t) => t.includes(`id="${id}"`));
+  if (tag && /\baria-label=|\baria-labelledby=/.test(tag)) return false; // aria
+  return !(tag && isWrappedInLabel(tag));                       // implicit wrapping label
+});
 
 check(
-  `Every field id is referenced by a <label for> or has its own aria-label (${ariaLabels} aria-label, ${labelsFor.length} label[for])`,
-  idsInFields.length <= ariaLabels + labelsFor.length + 2 // small allowance for grouped controls
+  `Every identified field is named (${ariaLabels} aria-label, ${labelsFor.length} label[for], ${wrappedControls} wrapping label)`,
+  unlabelledById.length === 0
 );
+if (unlabelledById.length > 0) {
+  failures.push(`  ↳ fields with an id but no accessible name: ${unlabelledById.join(', ')}`);
+}
 
 // ---------------------------------------------------------------------------
 // 5. Overlays are announced as dialogs

@@ -452,6 +452,18 @@
             <button onclick="switchAdminTab('orders')" id="admin-tab-btn-orders" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
               مدیریت سفارشات
             </button>
+            <button onclick="switchAdminTab('inventory')" id="admin-tab-btn-inventory" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              <span>انبار و موجودی بحرانی</span>
+            </button>
+            <button onclick="switchAdminTab('coupons')" id="admin-tab-btn-coupons" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              <span>کد تخفیف</span>
+            </button>
+            <button onclick="switchAdminTab('settings')" id="admin-tab-btn-settings" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              <span>تنظیمات فروشگاه</span>
+            </button>
+            <button onclick="switchAdminTab('audit')" id="admin-tab-btn-audit" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
+              <span>گزارش اقدامات</span>
+            </button>
             <button onclick="switchAdminTab('products')" id="admin-tab-btn-products" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-100 text-slate-700 hover:bg-slate-200">
               انبار و محصولات
             </button>
@@ -480,6 +492,97 @@
       </div>
 
       <!-- ADMIN TAB 1: WHOLESALE APPLICATIONS REVIEW -->
+      <!-- DASHBOARD: revenue, best sellers, critical stock (Phase 10) -->
+      <div id="admin-dashboard" class="space-y-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="admin-kpi-cards"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            <h3 class="font-black text-sm text-slate-900 mb-3">پرفروش‌ترین محصولات</h3>
+            <div id="admin-top-products" class="space-y-2 text-xs text-slate-600">—</div>
+          </div>
+          <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            <h3 class="font-black text-sm text-slate-900 mb-3">موجودی بحرانی (نیازمند تأمین)</h3>
+            <div id="admin-low-stock" class="space-y-2 text-xs text-slate-600">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTORY TAB -->
+      <div id="admin-tab-inventory" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 class="font-black text-lg text-slate-900 mb-1">انبار و موجودی بحرانی</h3>
+              <p class="text-xs text-slate-500">موجودی هر رنگ و سایز را مستقیم اینجا اصلاح کنید (بدون رفتن به فرم محصول)</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="number" id="low-stock-threshold" min="0" max="50" class="w-24 text-xs border border-slate-300 rounded-lg px-2 py-1.5"
+                     aria-label="آستانه موجودی بحرانی" value="3">
+              <button onclick="loadLowStock()" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">فیلتر آستانه</button>
+            </div>
+          </div>
+          <div id="admin-low-stock-table" class="space-y-3">—</div>
+        </div>
+      </div>
+
+      <!-- COUPONS TAB -->
+      <div id="admin-tab-coupons" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <h3 class="font-black text-lg text-slate-900 mb-1">کدهای تخفیف</h3>
+          <p class="text-xs text-slate-500 mb-5">کمپین فروش بسازید: درصدی یا مبلغی، با سقف، حداقل سبد و تاریخ انقضا</p>
+
+          <form onsubmit="createCoupon(event)" class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6">
+            <input required placeholder="کد (مثلاً BAHAR20)" aria-label="کد تخفیف"
+                   class="md:col-span-1 text-xs border border-slate-300 rounded-xl px-3 py-2 uppercase" id="coupon-code">
+            <select id="coupon-type" aria-label="نوع تخفیف" class="text-xs border border-slate-300 rounded-xl px-3 py-2">
+              <option value="PERCENT">درصدی (٪)</option>
+              <option value="FIXED">مبلغی (تومان)</option>
+            </select>
+            <input required type="number" min="1" placeholder="مقدار" aria-label="مقدار تخفیف"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-value">
+            <input type="number" min="0" placeholder="حداقل سبد (تومان)" aria-label="حداقل مبلغ سبد"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-min-basket">
+            <input type="number" min="0" placeholder="سقف تخفیف (تومان)" aria-label="سقف تخفیف"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-max-discount">
+            <input type="date" placeholder="تاریخ انقضا" aria-label="تاریخ انقضا"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-expires">
+            <input type="number" min="2" placeholder="سقف کل استفاده" aria-label="سقف تعداد استفاده"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-usage-limit">
+            <input type="number" min="1" placeholder="سقف هر کاربر" aria-label="سقف استفاده هر کاربر"
+                   class="text-xs border border-slate-300 rounded-xl px-3 py-2" id="coupon-per-user">
+            <select id="coupon-applies" aria-label="نوع حساب مشتری" class="text-xs border border-slate-300 rounded-xl px-3 py-2">
+              <option value="ALL">همه مشتریان</option>
+              <option value="RETAIL">فقط خرده‌فروشی</option>
+              <option value="WHOLESALE">فقط عمده‌فروشی</option>
+            </select>
+            <button type="submit" class="md:col-span-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">
+              ساخت کد تخفیف
+            </button>
+          </form>
+
+          <div id="admin-coupons-table" class="space-y-3">—</div>
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="admin-tab-settings" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <h3 class="font-black text-lg text-slate-900 mb-1">تنظیمات فروشگاه</h3>
+          <p class="text-xs text-slate-500 mb-5">تعرفه ارسال، آستانه ارسال رایگان، آستانه هشدار موجودی و اطلاعات فاکتور</p>
+          <div id="admin-settings-form">—</div>
+        </div>
+      </div>
+
+      <!-- AUDIT TAB -->
+      <div id="admin-tab-audit" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+          <h3 class="font-black text-lg text-slate-900 mb-1">گزارش اقدامات مدیران</h3>
+          <p class="text-xs text-slate-500 mb-5">چه کسی، چه زمانی، چه چیزی را تغییر داد</p>
+          <div id="admin-audit-table" class="space-y-2 text-xs">—</div>
+        </div>
+      </div>
+
       <div id="admin-tab-wholesale" class="space-y-4">
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <h3 class="font-black text-lg text-slate-900 mb-1">درخواست‌های عضویت در بخش عمده‌فروشی</h3>
@@ -495,6 +598,7 @@
         <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <h3 class="font-black text-lg text-slate-900 mb-1">مدیریت سفارش‌های مشتریان و همکاران</h3>
           <p class="text-xs text-slate-500 mb-6">تغییر وضعیت سفارش‌ها و مشاهده اقلام و صورتحساب</p>
+          <div id="admin-orders-controls"></div>
           <div id="admin-orders-table" class="space-y-4">
             <!-- Admin orders injected here -->
           </div>
@@ -513,6 +617,7 @@
               <span>+ افزودن محصول جدید</span>
             </button>
           </div>
+          <div id="admin-products-filter"></div>
           <div id="admin-products-table" class="space-y-4">
             <!-- Admin products injected here -->
           </div>
@@ -522,6 +627,72 @@
     </div>
 
   </main>
+
+  <!-- ADMIN: product create/edit modal -->
+  <div id="admin-product-modal" role="dialog" aria-modal="true" aria-label="فرم محصول"
+       class="hidden fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl my-8">
+      <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 id="admin-product-modal-title" class="font-black text-lg text-slate-900">افزودن محصول جدید</h3>
+          <p class="text-xs text-slate-500">کد کالا و اسلاگ به‌صورت خودکار ساخته می‌شوند</p>
+        </div>
+        <button type="button" onclick="closeAdminProductModal()" aria-label="بستن فرم محصول"
+                class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold">✕</button>
+      </div>
+
+      <form id="admin-product-form" onsubmit="saveProduct(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="text-xs font-bold text-slate-700">عنوان محصول
+            <input required id="pf-title" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+          </label>
+          <label class="text-xs font-bold text-slate-700">دسته‌بندی
+            <input required id="pf-category" list="pf-category-list" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+            <datalist id="pf-category-list"></datalist>
+          </label>
+          <label class="text-xs font-bold text-slate-700">قیمت خرده‌فروشی (تومان)
+            <input required id="pf-retail" type="number" min="1000" step="1000" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+          </label>
+          <label class="text-xs font-bold text-slate-700">قیمت عمده‌فروشی (تومان)
+            <input id="pf-wholesale" type="number" min="1000" step="1000" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+          </label>
+          <label class="text-xs font-bold text-slate-700">حداقل تعداد عمده
+            <input id="pf-wholesale-min" type="number" min="1" value="6" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal">
+          </label>
+          <label class="text-xs font-bold text-slate-700">جنس پارچه
+            <input id="pf-material" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal" placeholder="کرپ، جیر، لینن…">
+          </label>
+          <label class="text-xs font-bold text-slate-700">فصل
+            <input id="pf-season" list="pf-season-list" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal" value="چهار فصل">
+            <datalist id="pf-season-list">
+              <option value="بهار"></option><option value="تابستان"></option>
+              <option value="پاییز"></option><option value="زمستان"></option><option value="چهار فصل"></option>
+            </datalist>
+          </label>
+          <label class="text-xs font-bold text-slate-700 flex items-center gap-2 mt-5">
+            <input id="pf-featured" type="checkbox" class="w-4 h-4"> نمایش در بخش «پیشنهاد ویژه»
+          </label>
+        </div>
+
+        <label class="block text-xs font-bold text-slate-700">توضیحات
+          <textarea id="pf-description" rows="3" class="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-normal"></textarea>
+        </label>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-700">تنوع کالا (رنگ و سایز و موجودی)</span>
+            <button type="button" onclick="addVariantRow()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-bold">+ افزودن تنوع</button>
+          </div>
+          <div id="pf-variants" class="space-y-2"></div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeAdminProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700">انصراف</button>
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">ذخیره محصول</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- PRODUCT DETAIL MODAL -->
   <div id="product-modal" role="dialog" aria-modal="true" aria-label="جزئیات محصول" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
@@ -568,6 +739,22 @@
           <span>هزینه ارسال / باربری:</span>
           <span id="cart-shipping" class="font-mono">رایگان</span>
         </div>
+        <div id="cart-discount-row" class="hidden flex justify-between text-xs text-emerald-700 font-bold">
+          <span>تخفیف <span id="cart-coupon-code" class="font-mono"></span></span>
+          <span id="cart-discount" class="font-mono">− ۰ تومان</span>
+        </div>
+
+        <!-- Coupon (ADR-018): validated server-side on every recalculation -->
+        <div class="pt-3 border-t border-slate-100">
+          <div class="flex items-center gap-2">
+            <input id="cart-coupon-input" aria-label="کد تخفیف" placeholder="کد تخفیف دارید؟"
+                   class="flex-1 text-xs border border-slate-300 rounded-xl px-3 py-2 uppercase">
+            <button type="button" onclick="applyCouponCode()" id="cart-coupon-btn"
+                    class="px-3 py-2 min-h-[38px] rounded-xl bg-slate-900 text-white text-[11px] font-bold">اعمال</button>
+          </div>
+          <p id="cart-coupon-message" class="text-[11px] mt-1.5 hidden"></p>
+        </div>
+
         <div class="pt-2 border-t border-slate-200 flex justify-between text-base font-black text-slate-900">
           <span>مبلغ قابل پرداخت:</span>
           <span id="cart-payable" class="font-mono text-brand-700">۰ تومان</span>
