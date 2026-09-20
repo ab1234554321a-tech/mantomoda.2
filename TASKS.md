@@ -6,6 +6,7 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 11: Deployment & Release** — Docker image, compose (data volume + backup sidecar), Nginx/HTTPS, systemd unit, one-command server installer, pre-launch audit and the Persian hosting runbook (ADR-021).
 - [x] **Phase 10: Back-Office & Commerce** — shop settings, centralised pricing, coupons, product management with archive, inventory operations with owner alerts, order search/CSV export, signed printable invoices, admin dashboard and audit trail (ADR-017..020). 8 test suites green.
 - [x] **Phase 9.5: Revenue-Readiness Hardening** — all 12 items of `EXECUTION_PLAN.md` (persistence, inventory integrity, order state machine + audit trail, SMS notifications, process hardening, supertest HTTP tests, pagination, image upload, SEO, accessibility, backups, docs/release). ADR-010..016.
 
@@ -74,19 +75,15 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 2. In Progress (در حال اجرا)
 
-- [x] **Phase 10: Back-Office & Commerce (PHASE-10-PLAN.md, 11 items) — COMPLETE**
-  - [x] **Shop settings (ADR-017)**: shipping tariffs per province, free-shipping threshold, wholesale free shipping, low-stock threshold, owner mobile, invoice identity — all editable in the panel.
-  - [x] **Centralised pricing (ADR-017)**: `services/pricing/shipping.service.js` replaces the duplicated rule that existed in `cart.routes.js` and `order.routes.js`.
-  - [x] **Coupon engine (ADR-018)**: percent/fixed, minimum basket, cap, usage/per-user limits, expiry, retail/wholesale channel; server-side re-evaluation at checkout with 422 + reason code.
-  - [x] **Product validation + identifiers (ADR-018)**: Zod schemas, toman integers, unique slug, Latin-only warehouse SKU, duplicate variant and wholesale-price checks; field whitelist on update.
-  - [x] **Archive instead of delete (ADR-018)**: products are removed from sale without breaking order history; restore supported; slugs stay stable across title edits.
-  - [x] **Admin product panel**: create/edit form with variant editor, image upload, archive/restore, filter by active/archived.
-  - [x] **Inventory operations (ADR-019)**: bulk stock edit screen, low-stock list, throttled owner SMS alert that never blocks a sale.
-  - [x] **Order operations**: search (number, customer, mobile, city, coupon), status/payment/date filters, pagination, CSV export with UTF-8 BOM for Excel.
-  - [x] **Invoice (ADR-020)**: owner-only JSON invoice + signed 30-day printable link (noindex, tamper/expiry verified).
-  - [x] **Dashboard (ADR-020)**: recognised revenue today/month/all-time, average order value, awaiting-payment, best sellers, critical stock.
-  - [x] **Audit trail (ADR-020)**: every successful admin change recorded with actor/action/entity/IP, secrets redacted, admin-only.
-  - [x] **Tests**: Level 8 suite (`tests/commerce.test.js`) — 8 suites total; `npm run a11y` green.
+- [x] **Phase 11: Deployment & Release — COMPLETE**
+  - [x] Production `Dockerfile` + `docker-compose.yml` (restart-always, data volume, backup sidecar, log rotation, memory guard).
+  - [x] Nginx reverse proxy with HTTPS/certbot, upload ceiling and immutable caching (`deploy/nginx.conf`).
+  - [x] systemd unit for the non-Docker path (`deploy/mantomoda.service`).
+  - [x] One-command server installer (`scripts/server-install.sh`) with generated secret, persistence on by default and root guard.
+  - [x] Pre-launch audit (`scripts/preflight.sh`) wired into `npm run preflight` and CI.
+  - [x] Plain-Persian launch runbook (`HOSTING-GUIDE.md`) and updated upload/backup guidance.
+  - [x] Verified the production install path end-to-end from a clean `npm ci --omit=dev`.
+  - [ ] (User action) rent a server + domain and run the single install command.
 ---
 
 ## 3. Planned (برنامه‌ریزی شده)

@@ -1,0 +1,74 @@
+# =============================================================================
+#  Manto Moda — production compose file
+#
+#  Quick start on a server:
+#    1. cp .env.example .env      → fill in JWT_SECRET, PERSIST_DATA=true, providers
+#    2. docker compose up -d --build
+#    3. docker compose logs -f manto
+#
+#  Why these defaults:
+#   * `restart: unless-stopped` — the shop comes back after a reboot or a crash.
+#   * The port is published on 127.0.0.1 only: Nginx (see deploy/nginx.conf)
+#     terminates HTTPS and proxies to the container, so the Node port is never
+#     exposed to the internet directly.
+#   * ./data is bind-mounted so the orders snapshot and the uploaded photos live
+#     on the host disk, not inside the container. That is what makes them survive
+#     a redeploy — and what scripts/backup.sh archives.
+# =============================================================================
+
+services:
+  manto:
+    build: .
+    image: manto-moda:latest
+    container_name: manto-moda
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Absolute paths inside the container, mapped to ./data on the host below.
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/data/uploads
+      PERSIST_DATA: "true"
+
+    volumes:
+      - ./data:/app/data
+
+    ports:
+      # Reachable from the host only; Nginx publishes it publicly.
+      - "127.0.0.1:3000:3000"
+
+    # Resource guard rails: a runaway process cannot take the server down with it.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Daily backup sidecar: archives ./data on a schedule using the repo script.
+  # Set BACKUP_CRON in .env (default: 03:30 every night).
+  backup:
+    image: alpine:3.20
+    container_name: manto-backup
+    restart: unless-stopped
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+    environment:
+      DATA_DIR: /data
+      BACKUP_DIR: /backups
+      KEEP: "30"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "$${BACKUP_CRON:-30 3 * * *} /bin/sh /scripts/backup.sh --keep $${KEEP:-30} >> /backups/backup.log 2>&1" > /etc/crontabs/root
+        crond -f -l 8

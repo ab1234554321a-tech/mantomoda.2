@@ -1,0 +1,49 @@
+# =============================================================================
+#  systemd unit — the non-Docker path (plain Node on a VPS)
+#
+#  Install:
+#    1. sudo cp deploy/mantomoda.service /etc/systemd/system/
+#    2. Edit WorkingDirectory/User, then:
+#    3. sudo systemctl daemon-reload && sudo systemctl enable --now mantomoda
+#    4. sudo journalctl -u mantomoda -f
+#
+#  Why systemd instead of `nohup node …`:
+#   * Restarts the shop automatically after a crash or a server reboot.
+#   * Sends SIGTERM on stop, which is what makes the app flush its data snapshot
+#     to disk (ADR-010). Killing the process any other way can lose the last few
+#     seconds of writes.
+# =============================================================================
+
+[Unit]
+Description=Manto Moda — online store (Node.js)
+Documentation=file:///srv/mantomoda/HOSTING-GUIDE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=manto
+Group=manto
+WorkingDirectory=/srv/mantomoda
+EnvironmentFile=/srv/mantomoda/.env
+
+# Never run the shop as root.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+ExecStart=/usr/bin/node src/server/index.js
+
+Restart=always
+RestartSec=5
+# Give the app time to flush its snapshot before systemd escalates to SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mantomoda
+
+[Install]
+WantedBy=multi-user.target

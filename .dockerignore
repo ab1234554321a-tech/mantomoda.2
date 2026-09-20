@@ -1,0 +1,25 @@
+# Build context hygiene: without this, `docker build` uploads ~100 MB of things
+# the image never needs (and that would slow every deploy).
+node_modules
+.git
+.github
+data
+backups
+logs
+*.log
+.claude
+.mcp
+tests
+skills
+research
+agents
+docs
+backups
+*.md
+!.env.example
+coverage
+dist
+out
+target
+.DS_Store
+manto-moda-updated.zip

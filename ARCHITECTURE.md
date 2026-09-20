@@ -334,3 +334,16 @@ The shop can now be operated by its owner without a developer.
 **Test gate**: `npm test` now runs **8 suites**; `tests/commerce.test.js` (Level 8) covers pricing,
 coupons, catalog validation, low-stock alerts, order search/export, invoices (including tamper and
 expiry), dashboard accuracy, the audit trail, settings propagation and archive semantics.
+
+## 14. Deployment & Release (added 2026-09-20 — ADR-021)
+
+| Artifact | Purpose |
+|---|---|
+| `Dockerfile` | Production image: Debian slim (matches where `sharp` was verified), production-only deps, non-root user, healthcheck, SIGTERM-aware (flushes the data snapshot) |
+| `docker-compose.yml` | `restart: unless-stopped`, `./data` bind mount (orders + uploads), memory limit, log rotation, Node port published on localhost only, daily backup sidecar |
+| `.dockerignore` | Keeps the build context at ~4 MB instead of ~84 MB (excludes `node_modules`, data, docs, skills) |
+| `deploy/nginx.conf` | HTTPS termination (certbot), HTTP→HTTPS redirect, 6 MB upload ceiling, immutable caching for `/uploads` |
+| `deploy/mantomoda.service` | systemd unit for the non-Docker path; SIGTERM with a generous stop timeout so data is flushed |
+| `scripts/server-install.sh` | One idempotent command: Docker, service user, `.env` with generated secret, build, start, Nginx + certificate, nightly backup, preflight |
+| `scripts/preflight.sh` | Launch-readiness audit; blocks the mistakes that actually destroy a first launch |
+| `HOSTING-GUIDE.md` | Plain-language Persian runbook: what hosting is, recommended server, costs, step-by-step, 10-point post-launch checklist, day-to-day commands, troubleshooting table |

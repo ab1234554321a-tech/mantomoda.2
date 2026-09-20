@@ -115,3 +115,42 @@ Everything in this table is done from the admin panel; each row is covered by `t
 
 **Recommended first-run setup:** enter the real shipping tariff, set your mobile number under
 تنظیمات فروشگاه (so low-stock alerts reach you), and create your first coupon.
+
+## 11. Going Live (deployment)
+
+> The full walkthrough, in Persian, is in **[HOSTING-GUIDE.md](HOSTING-GUIDE.md)** (costs, server
+> choice, step-by-step, post-launch checklist, troubleshooting).
+
+A shop needs four things: a **server**, a **domain**, **HTTPS** and **provider credentials**.
+The repository ships everything else:
+
+```bash
+# On a fresh Ubuntu 22.04/24.04 server, as root, with the project in place:
+DOMAIN=your-domain.ir bash scripts/server-install.sh
+```
+
+That single idempotent command installs Docker, creates a service user, generates a strong
+`JWT_SECRET`, enables persistence, builds and starts the shop, installs Nginx + a free HTTPS
+certificate, schedules a nightly verified backup, and finishes by auditing the environment.
+
+**Before making the shop public, run the readiness audit — it catches the mistakes that actually
+destroy a launch:**
+
+```bash
+npm run preflight      # or: bash scripts/preflight.sh
+```
+
+It fails loudly when persistence is off, `JWT_SECRET` is weak, a live provider has no credentials,
+the payment callback points at localhost, the data directory is unwritable, or no backup is scheduled
+— each with its fix printed next to the problem.
+
+| Artifact | What it gives you |
+|---|---|
+| `Dockerfile` / `docker-compose.yml` | Reproducible production runtime; data volume; restart-always; daily backup sidecar |
+| `deploy/nginx.conf` | HTTPS, HTTP→HTTPS redirect, 6 MB upload ceiling, image caching |
+| `deploy/mantomoda.service` | Plain Node + systemd alternative for VPS setups without Docker |
+| `scripts/server-install.sh` | One-command install/update path |
+| `scripts/preflight.sh` | Launch-readiness audit (also a CI job) |
+
+**Note:** GitHub (or the zip) is a *backup of the code* — it does not put the shop online. Hosting is
+what makes customers able to buy; see `HOSTING-GUIDE.md`.

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Deployment & release layer (ADR-021)** — the project could be built but not launched; it now ships with everything needed to go live on a real server.
+  - **`Dockerfile`** (production): Debian slim (the environment family where the `sharp` upload pipeline was verified), production-only dependencies, non-root `node` user, healthcheck via Node, `STOPSIGNAL SIGTERM` so the data snapshot is flushed on stop.
+  - **`docker-compose.yml`**: restart-always, `./data` bind mount (orders **and** uploaded photos survive redeploys), memory limit, log rotation, Node port bound to `127.0.0.1` only, and a daily **backup sidecar**.
+  - **`deploy/nginx.conf`**: HTTPS termination with certbot, HTTP→HTTPS redirect, 6 MB upload ceiling, immutable caching for uploaded images, forwarded-proto header so payment callbacks and canonical URLs are correct.
+  - **`deploy/mantomoda.service`**: systemd unit for the non-Docker path, with SIGTERM and a stop timeout long enough to flush data.
+  - **`scripts/server-install.sh`**: one idempotent command for a fresh Ubuntu server — installs Docker, creates a service user, writes `.env` with a randomly generated `JWT_SECRET`, enables persistence, builds and starts the shop, installs Nginx + a free HTTPS certificate when `DOMAIN` is provided, schedules the nightly backup, then runs the readiness check. Refuses to run without root.
+  - **`scripts/preflight.sh`**: pre-launch audit that catches the failures which actually kill a first launch — persistence off, weak or missing `JWT_SECRET`, live provider selected without credentials, **payment callback pointing at localhost** (money collected, order never confirmed), unwritable data directory, no backup schedule, and more — each with its fix printed next to it.
+  - **`HOSTING-GUIDE.md`**: plain-Persian runbook — what hosting means versus a code backup, recommended server and why, realistic monthly costs, step-by-step launch, a 10-point post-launch checklist, day-to-day commands and a troubleshooting table.
+  - **Verified**: a clean `npm ci --omit=dev` install (155 packages, no devDependencies) boots the real server, serves the storefront, accepts an order and writes the data snapshot to disk. The Docker image itself could not be built in this sandbox (no Docker available) — the compose/Dockerfile paths are documented as untested-here.
 - **Phase 10 — Back-office & commerce (ADR-017..020)**: the shop is now operable by its owner without a developer.
   - **Shop settings** (`PUT /api/admin/settings`): shipping tariffs per province, free-shipping threshold, free shipping for wholesale partners, low-stock threshold and alert throttle, owner mobile, invoice identity — all editable in the panel and applied immediately.
   - **One pricing policy** (`services/pricing/shipping.service.js`): replaces the rule that was duplicated in the cart and order routes, so the quoted price and the charged price cannot diverge.

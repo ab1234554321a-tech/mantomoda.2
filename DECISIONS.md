@@ -362,3 +362,35 @@ This log contains the record of all major architectural and technical decisions 
     stored order only.
 - **Consequences**: Every price/stock/status change has an owner, accounting is a two-click download,
   and invoices are shareable without exposing other customers' data.
+
+---
+
+## ADR-021: Deployment Architecture — Self-Hosted Docker on an Iranian VPS
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: Everything the project had built was still unreachable by a customer: no host, no
+  domain, no HTTPS. The owner is not technical, so the deployment method had to reduce their actions
+  to something they can copy-paste, and it had to place the shop where its customers are (an Iranian
+  audience, Iranian payment gateway callback, no sanctions/filtering friction).
+- **Decision**:
+  - Ship a **production container** (`Dockerfile`, Debian slim, non-root, production-only
+    dependencies, healthcheck, `STOPSIGNAL SIGTERM` so the data snapshot is flushed) plus
+    `docker-compose.yml` with `restart: unless-stopped`, a **bind-mounted `./data`** (orders snapshot +
+    uploaded photos survive redeploys), a memory guard, bounded logs, and a **daily backup sidecar**.
+  - Publish the Node port on `127.0.0.1` only; `deploy/nginx.conf` terminates HTTPS (Let's Encrypt via
+    certbot), enforces a 6 MB upload ceiling and caches `/uploads` immutably.
+  - Provide `scripts/server-install.sh`: one idempotent command that installs Docker, creates a
+    service user, generates a random `JWT_SECRET`, turns persistence on, builds and starts the shop,
+    installs Nginx + a free certificate when `DOMAIN` is given, schedules the nightly backup and runs
+    the readiness check. It refuses to run without root and stops on the first error.
+  - Provide `scripts/preflight.sh`: an environment audit that catches the launch-killing mistakes —
+    persistence off, weak/missing secret, provider selected without credentials, **payment callback
+    pointing at localhost** (money taken, order never confirmed), unwritable data directory, no backup
+    schedule — each with the fix in the same line.
+  - Also ship `deploy/mantomoda.service` for the non-Docker path (plain Node + systemd), because many
+    Iranian VPS setups still run services that way.
+- **Consequences**: Going live is: rent a VPS + domain, point DNS, run one command, paste two
+  credentials. Deployment is reproducible and reversible, and the "my orders disappeared" class of
+  incident is prevented by configuration rather than by memory. Ceiling: a single-server deployment —
+  horizontal scaling would require moving the store to a real database (`TD-006`) and object storage
+  for uploads (`TD-007`).

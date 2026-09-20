@@ -45,6 +45,18 @@ jobs:
       - name: Accessibility gate (ADR-016)
         run: npm run a11y
 
+      - name: Deployment scripts are syntactically valid and safe
+        run: |
+          for f in scripts/preflight.sh scripts/server-install.sh scripts/backup.sh; do
+            bash -n "$f" || { echo "::error::$f has a syntax error"; exit 1; }
+            echo "OK: $f"
+          done
+          # The installer must refuse to run without root (safety check).
+          if bash scripts/server-install.sh > /tmp/install.log 2>&1; then
+            echo "::error::server-install.sh should refuse to run as non-root"; exit 1
+          fi
+          grep -q "root" /tmp/install.log && echo "Root guard works."
+
       - name: Backup script smoke test
         run: |
           bash -n scripts/backup.sh
