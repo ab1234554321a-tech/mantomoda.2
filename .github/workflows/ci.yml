@@ -9,9 +9,16 @@ on:
 permissions:
   contents: read
 
+# A new push supersedes the previous run (devops-automator finding): without this,
+# several runs compete for the same job and the newest result is not the one you
+# read. Cancelling in-flight runs on the same branch keeps the signal current.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Tests (9 suites) + A11y + Security Audit
+    name: Tests (10 suites) + A11y + Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -41,6 +48,10 @@ jobs:
           NODE_ENV: test
           # Tests generate their own secrets; placeholders below are never used in production.
           JWT_SECRET: ci_only_secret_key_that_is_long_enough_for_validation_1234
+          # Level 10 boots real production-mode servers on loopback with their own
+          # temporary data directory to prove the demo scaffolding stays off a live shop.
+          ADMIN_EMAIL: ci-owner@example.ir
+          ADMIN_PASSWORD: ci-owner-password-long-enough
 
       - name: Accessibility gate (ADR-016)
         run: npm run a11y

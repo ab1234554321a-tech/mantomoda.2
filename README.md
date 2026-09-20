@@ -133,6 +133,15 @@ That single idempotent command installs Docker, creates a service user, generate
 `JWT_SECRET`, enables persistence, builds and starts the shop, installs Nginx + a free HTTPS
 certificate, schedules a nightly verified backup, and finishes by auditing the environment.
 
+### The owner's login (ADR-024)
+
+A live shop has no demo accounts. Production refuses to start without `ADMIN_EMAIL` and
+`ADMIN_PASSWORD`; `scripts/server-install.sh` generates both, writes them into `.env` and prints the
+password **once** at the end of the install. `npm run preflight` treats a missing account, a short
+password, or demo switches left on (`ALLOW_DEMO_MODE`, `SEED_DEMO_DATA`) as launch blockers, because
+the role simulator signs an admin token without a password and the sample accounts share a password
+published in this repository.
+
 **Before making the shop public, run the readiness audit — it catches the mistakes that actually
 destroy a launch:**
 

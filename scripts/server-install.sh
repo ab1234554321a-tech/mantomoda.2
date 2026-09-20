@@ -7,7 +7,8 @@
 #    2. installs Docker + the compose plugin if they are missing;
 #    3. creates a dedicated service user and a deploy directory;
 #    4. copies the project into place (or uses the current directory);
-#    5. generates a strong JWT_SECRET into .env on first run;
+#    5. generates a strong JWT_SECRET *and the owner's admin login* into .env on
+#       first run (the password is printed once, at the end of the install);
 #    6. builds and starts the shop with restart-always;
 #    7. optionally installs Nginx + a free HTTPS certificate when DOMAIN is set;
 #    8. runs the pre-launch check and prints what is still needed.
@@ -99,7 +100,20 @@ if [ ! -f "$APP_DIR/.env" ]; then
   fi
   # Persistence on by default: without it every restart erases the orders.
   sed -i 's|^PERSIST_DATA=.*|PERSIST_DATA=true|' "$APP_DIR/.env" 2>/dev/null || printf 'PERSIST_DATA=true\n' >> "$APP_DIR/.env"
-  ok "فایل .env ساخته شد و JWT_SECRET تصادفی تولید شد"
+
+  # Owner account (ADR-024). Production refuses to start without it, because the
+  # alternative is a shop whose only admin is a demo login published on GitHub.
+  # The password is generated here and printed exactly once.
+  ADMIN_EMAIL_VALUE="${ADMIN_EMAIL:-owner@${DOMAIN:-manto.local}}"
+  ADMIN_PASSWORD_VALUE="${ADMIN_PASSWORD:-$(head -c 24 /dev/urandom | base64 | tr -d '\n=+/' | cut -c1-16)}"
+  {
+    printf '\n# حساب مدیر فروشگاه — همین‌ها را برای ورود به پنل استفاده کن\n'
+    printf 'ADMIN_EMAIL=%s\n' "$ADMIN_EMAIL_VALUE"
+    printf 'ADMIN_PASSWORD=%s\n' "$ADMIN_PASSWORD_VALUE"
+    printf 'ADMIN_NAME=%s\n' "${ADMIN_NAME:-مدیر فروشگاه}"
+  } >> "$APP_DIR/.env"
+
+  ok "فایل .env ساخته شد: JWT_SECRET تصادفی + حساب مدیر فروشگاه"
 else
   ok "فایل .env از قبل وجود دارد (دست‌نخورده ماند)"
 fi
@@ -187,7 +201,13 @@ cat <<SUMMARY
  ✅ نصب تمام شد
 ==============================================
  آدرس فروشگاه: ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$(hostname -I 2>/dev/null | awk '{print $1}'):3000}
- پنل مدیریت:   ${DOMAIN:+https://$DOMAIN/}${DOMAIN:-http://$(hostname -I 2>/dev/null | awk '{print $1}'):3000/} (از منوی بالای سایت → ورود مدیر)
+ پنل مدیریت:   ${DOMAIN:+https://$DOMAIN/}${DOMAIN:-http://$(hostname -I 2>/dev/null | awk '{print $1}'):3000/}
+
+ ⚠ ورود به پنل مدیریت (این رمز فقط همین یک بار نمایش داده می‌شود — یادداشتش کن):
+     ایمیل: ${ADMIN_EMAIL_VALUE:-$(grep -h '^ADMIN_EMAIL=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2)}
+     رمز:   ${ADMIN_PASSWORD_VALUE:-$(grep -h '^ADMIN_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2)}
+   (این دو مقدار در $APP_DIR/.env ذخیره شده‌اند؛ برای تغییر رمز، همان فایل را ویرایش کن
+    و بعد: cd $APP_DIR && docker compose restart manto — اگر رمز را عوض کنی، رمز جدید اعمال می‌شود.)
 
  دستورهای روزمره:
    دیدن وضعیت:    cd $APP_DIR && docker compose ps

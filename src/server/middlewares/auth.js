@@ -1,5 +1,6 @@
 import { db } from '../db/store.js';
 import { verifyToken } from '../utils/auth-crypto.js';
+import { isProduction } from '../utils/runtime-mode.js';
 
 /**
  * Global Authentication Context Extractor
@@ -18,7 +19,9 @@ export function authenticate(req, res, next) {
       const decoded = verifyToken(token);
       if (decoded && decoded.id) {
         const user = db.findUserById(decoded.id);
-        if (user) {
+        // Defence in depth (ADR-024): a demo token issued before the guard above
+        // existed must not survive a restart of a live shop either.
+        if (user && !(user.isDemo && isProduction())) {
           req.user = {
             id: user.id,
             email: user.email,

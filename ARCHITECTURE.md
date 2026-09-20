@@ -392,3 +392,26 @@ The scanners never block a release by themselves (CI runs them with `continue-on
 the report as an artifact). This is deliberate: the first audit produced 7 "CRITICAL" findings in a
 codebase with no SQL and one genuinely exploitable chain out of 39 `innerHTML` warnings. Automation
 narrows the search; the blocker is always a test.
+
+---
+
+## 16. Runtime Modes & the Demo Boundary (added 2026-09-20 — ADR-024)
+
+The project serves two audiences from one codebase: a **showcase** (where a visitor can flip between
+roles and a sample catalogue is useful) and a **live shop** (where any of that is a breach). The
+boundary is one module, `src/server/utils/runtime-mode.js`, so the answer cannot drift between the
+route layer, the middleware and the client:
+
+| Capability | development / test | production |
+|---|---|---|
+| `POST /api/auth/switch-role` (signs a role token with no password) | available | **404** unless `ALLOW_DEMO_MODE=true` |
+| Role dropdown in the storefront header | shown | hidden (client reads `/api/config`) |
+| Sample accounts (`isDemo: true`) | loaded, can log in | never created, filtered from snapshots, refused on login *and* in the auth middleware |
+| Sample catalogue / orders / customers | loaded | empty shop unless `SEED_DEMO_DATA=true` |
+| Owner admin account | from seed data | from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; **boot fails** if missing |
+| `/api/health`, `/api/config` | report `demoMode: true` | report `demoMode: false`, version from `package.json` |
+
+Enforcement points, in order: boot guard (`assertProductionReady`), route guard (404), middleware guard
+(demo-user tokens are inert), client (switcher not rendered), and the environment audit
+(`scripts/preflight.sh` blocks a launch with a missing owner account or a demo switch left on).
+Covered by the Level 10 suite, which spawns real production servers.

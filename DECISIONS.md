@@ -451,3 +451,51 @@ This log contains the record of all major architectural and technical decisions 
 - **Consequences**: The skills toolchain produces evidence on every run instead of being decoration,
   the owner can re-run the whole audit with one command (`npm run skills-audit`), and the gate stays
   honest because automated-but-unvetted scanners can never block a release on their own.
+
+---
+
+## ADR-024: Demo Scaffolding Must Not Reach a Live Shop
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: A full review (driven by the skills audit and by probing the running server in
+  production mode) found that the project's *showcase* features were reachable from the internet once
+  the shop was deployed, and that any one of them handed over the back office:
+  1. `POST /api/auth/switch-role` signs a token for a requested role — including `ADMIN` — **without
+     any password**. It exists so the UI can demonstrate the three customer roles. On a live shop an
+     anonymous visitor needed one HTTP request to read every order, every customer's name, phone and
+     address, and to change prices and order statuses.
+  2. The four seeded demo accounts all share one bcrypt hash whose plain password (`password123`) is
+     printed in this public repository. `POST /api/auth/login` accepted them in production.
+  3. A fresh production install also loaded the sample catalogue, sample orders and sample customers,
+     so a real shop opened showing invented revenue and other people's invented data.
+  4. The storefront header displayed a dropdown containing «👑 مدیر سیستم» to every visitor.
+  The prior fixes (ADR-022, ADR-023) dealt with bugs *inside* the application; this one is about the
+  difference between a demo and a business, which no scanner flags because the code is not wrong — it
+  is wrong *there*.
+- **Decision**:
+  - One module decides what a production deployment may do (`src/server/utils/runtime-mode.js`).
+    Demo behaviour is available in development/test, and in production only with an explicit
+    `ALLOW_DEMO_MODE=true` / `SEED_DEMO_DATA=true` opt-in that `preflight.sh` reports as a blocker.
+  - The role simulator answers **404** in production (not 403 — it does not advertise that it exists),
+    and the client hides the switcher using `/api/config`, so the dropdown is never rendered on a live
+    shop. A visitor simply browses as a guest or logs in.
+  - Demo accounts are marked `isDemo: true` in the seed data. They are not created in production, they
+    are filtered out of any snapshot carried over from a demo install, and — as defence in depth —
+    both the login route and the auth middleware refuse them, so a token signed before this change
+    cannot be used either. The refusal is byte-identical to a wrong password, so no account is
+    enumerated.
+  - The owner's account comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Production **refuses to boot**
+    without it (the same policy already applied to unconfigured payment/SMS providers);
+    `scripts/server-install.sh` generates a strong password and prints it once at the end of the
+    install; `scripts/preflight.sh` reports a missing account, a weak password, and demo switches left
+    on as launch blockers.
+  - A fresh production shop starts **empty** (no sample catalogue, orders or customers). A shop opens
+    with the owner's own products, not with someone else's demo data.
+  - `/api/health` and `/api/config` now expose `demoMode` and read the version from `package.json`
+    (the hard-coded string had drifted one release behind).
+- **Consequences**: The public internet can no longer reach an admin session, and the difference
+  between "demo" and "live" is a deliberate, auditable switch rather than an accident of deployment.
+  Cost: the demo experience on a server requires `ALLOW_DEMO_MODE=true`, and a real launch requires one
+  extra piece of configuration that the installer writes for you. Covered by **Level 10** tests
+  (`tests/production-guards.test.js`), which boot real production servers and assert every claim above,
+  including that development and test still keep the full demo behaviour.

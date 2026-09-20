@@ -43,6 +43,17 @@ export async function hashPassword(plainPassword) {
 }
 
 /**
+ * Synchronous variant, used by the data store's constructor: the store is built
+ * at import time (and by ~10 modules), so it cannot await. Same cost, same hash —
+ * this exists purely because the owner account must exist before the first
+ * request is served (ADR-024).
+ */
+export function hashPasswordSync(plainPassword) {
+  if (!plainPassword) throw new Error('Password is required for hashing');
+  return bcrypt.hashSync(plainPassword, SALT_ROUNDS);
+}
+
+/**
  * Compare plain-text password with stored bcrypt hash
  */
 export async function comparePassword(plainPassword, hashedPassword) {

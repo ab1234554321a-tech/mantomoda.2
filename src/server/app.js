@@ -11,6 +11,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
+import { assertProductionReady, publicRuntimeConfig, appVersion } from './utils/runtime-mode.js';
 
 import { authenticate } from './middlewares/auth.js';
 import { errorHandler } from './middlewares/error-handler.js';
@@ -33,6 +34,11 @@ import { publicPath, indexHtmlPath } from './paths.js';
 export { publicPath };
 
 export function createApp() {
+  // Refuse to serve a production deployment that has no real owner account
+  // (ADR-024). Checked here rather than only in index.js so any entry point —
+  // including a future serverless wrapper — inherits the guard.
+  assertProductionReady();
+
   const app = express();
 
   // Do not advertise the framework.
@@ -117,13 +123,22 @@ export function createApp() {
   app.use(authenticate);
 
   // 7. Health & Observability Endpoint
+  // Public runtime configuration for the client (no secrets). The storefront
+  // uses `demoMode` to decide whether to show the role simulator at all.
+  app.get('/api/config', (req, res) => {
+    res.json({ success: true, data: publicRuntimeConfig() });
+  });
+
   app.get('/api/health', (req, res) => {
     const memoryUsage = process.memoryUsage();
     res.json({
       status: 'healthy',
       project: 'Manto Moda',
-      version: '0.3.0-rc1',
+      // Read from package.json: a hard-coded string here drifted one release
+      // behind the rest of the project (ADR-024).
+      version: appVersion(),
       environment: process.env.NODE_ENV || 'development',
+      demoMode: publicRuntimeConfig().demoMode,
       uptimeSeconds: Math.floor(process.uptime()),
       memory: {
         heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),

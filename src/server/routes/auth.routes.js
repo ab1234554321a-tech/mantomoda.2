@@ -4,6 +4,7 @@ import { requireAuth } from '../middlewares/auth.js';
 import { hashPassword, comparePassword, signToken } from '../utils/auth-crypto.js';
 import { validate, loginSchema, registerSchema, otpRequestSchema, otpVerifySchema } from '../middlewares/validate.js';
 import { requestOtp, verifyOtp, OTP_CONFIG } from '../services/otp.service.js';
+import { isProduction, demoModeEnabled } from '../utils/runtime-mode.js';
 
 const router = Router();
 
@@ -19,6 +20,18 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       success: false,
       error: 'INVALID_CREDENTIALS',
       message: 'کاربری با این مشخصات یافت نشد یا اطلاعات ورود نادرست است.'
+    });
+  }
+
+  // Demo accounts are refused on a live shop even if one survived in an old
+  // snapshot: their shared password is published in this repository (ADR-024).
+  // The refusal is deliberately identical to a wrong password, so it reveals
+  // nothing about which accounts exist.
+  if (user.isDemo && isProduction()) {
+    return res.status(401).json({
+      success: false,
+      error: 'INVALID_CREDENTIALS',
+      message: 'اطلاعات ورود یا رمز عبور وارد شده نادرست است.'
     });
   }
 
@@ -197,7 +210,18 @@ router.get('/me', requireAuth, (req, res) => {
 });
 
 // Switch Role Simulator Endpoint (Issues real cryptographic signed JWTs for selected roles)
+//
+// SECURITY (ADR-024): this endpoint signs a token for whatever role is asked
+// for, without a password — which is exactly what a demo needs and exactly what
+// must never exist on a live shop. It answered from the public internet in
+// production and handed out an ADMIN token to anyone. It is now absent unless
+// the deployment explicitly opted into demo mode, and a 404 is returned rather
+// than a 403 so the endpoint does not advertise that it exists.
 router.post('/switch-role', (req, res) => {
+  if (!demoModeEnabled()) {
+    return res.status(404).json({ success: false, error: 'NOT_FOUND', message: 'مسیر مورد نظر یافت نشد.' });
+  }
+
   const { targetRole } = req.body; // 'GUEST', 'REGULAR', 'WHOLESALE', 'PENDING', 'ADMIN'
 
   let targetUser = null;

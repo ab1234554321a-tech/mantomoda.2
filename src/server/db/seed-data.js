@@ -11,6 +11,8 @@ export const SEED_USERS = [
     role: "ADMIN",
     isWholesaleVerified: true,
     passwordHash: DEFAULT_HASHED_PASSWORD,
+    // Demo scaffolding: never usable on a live shop (ADR-024).
+    isDemo: true,
     createdAt: "2026-08-01T10:00:00Z"
   },
   {
@@ -21,6 +23,8 @@ export const SEED_USERS = [
     role: "WHOLESALE",
     isWholesaleVerified: true,
     passwordHash: DEFAULT_HASHED_PASSWORD,
+    // Demo scaffolding: never usable on a live shop (ADR-024).
+    isDemo: true,
     companyName: "بوتیک الیزه ونک",
     economicCode: "41159876231",
     businessAddress: "تهران، میدان ونک، مرکز تجاری آسمان، طبقه اول، پلاک ۴۲",
@@ -34,6 +38,8 @@ export const SEED_USERS = [
     role: "REGULAR",
     isWholesaleVerified: false,
     passwordHash: DEFAULT_HASHED_PASSWORD,
+    // Demo scaffolding: never usable on a live shop (ADR-024).
+    isDemo: true,
     createdAt: "2026-08-15T14:20:00Z"
   },
   {
@@ -44,6 +50,8 @@ export const SEED_USERS = [
     role: "REGULAR",
     isWholesaleVerified: false,
     passwordHash: DEFAULT_HASHED_PASSWORD,
+    // Demo scaffolding: never usable on a live shop (ADR-024).
+    isDemo: true,
     companyName: "مزون شیراز شیک",
     economicCode: "98765432100",
     businessAddress: "شیراز، خیابان عفیف‌آباد، مجتمع سپهر، واحد ۱۲",

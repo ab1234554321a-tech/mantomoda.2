@@ -4,6 +4,8 @@
 import crypto from 'crypto';
 import { SEED_USERS, SEED_APPLICATIONS, SEED_CATEGORIES, SEED_PRODUCTS, SEED_ORDERS } from './seed-data.js';
 import { loadSnapshot, createSaver, isPersistenceEnabled, snapshotPath } from './persistence.js';
+import { hashPasswordSync } from '../utils/auth-crypto.js';
+import { isProduction, demoDataEnabled, ownerAccount } from '../utils/runtime-mode.js';
 
 /**
  * Allowed order status transitions (ADR-011).
@@ -100,8 +102,19 @@ class DataStore {
   constructor() {
     const snapshot = loadSnapshot();
 
+    // Production never accepts demo scaffolding (ADR-024): the sample accounts
+    // share a password that is published in this repository, so a live shop must
+    // neither create them nor keep them from an older snapshot.
+    const keepDemoData = demoDataEnabled();
+
     if (snapshot) {
-      this.users = snapshot.users;
+      this.users = keepDemoData ? snapshot.users : (snapshot.users || []).filter((u) => !u.isDemo);
+      if (!keepDemoData && this.users.length !== (snapshot.users || []).length) {
+        console.warn(
+          `[Manto Moda] ${(snapshot.users || []).length - this.users.length} حساب نمونه از فروشگاه واقعی حذف شد ` +
+          '(رمز مشترک آن‌ها در مخزن عمومی است).'
+        );
+      }
       this.applications = snapshot.applications;
       this.categories = snapshot.categories;
       this.products = snapshot.products;
@@ -111,15 +124,19 @@ class DataStore {
       this.settings = mergeSettings(DEFAULT_SETTINGS, snapshot.settings || {});
       // Monotonic counter that makes order numbers unique (see nextOrderNumber).
       this.orderSequence = Number(snapshot.orderSequence || 0);
+      if (isProduction()) this.ensureOwnerAccount();
       this.coupons = snapshot.coupons || [];
       this.adminActions = snapshot.adminActions || [];
       this.loadedFromSnapshot = true;
     } else {
-      this.users = JSON.parse(JSON.stringify(SEED_USERS));
-      this.applications = JSON.parse(JSON.stringify(SEED_APPLICATIONS));
-      this.categories = JSON.parse(JSON.stringify(SEED_CATEGORIES));
-      this.products = JSON.parse(JSON.stringify(SEED_PRODUCTS));
-      this.orders = JSON.parse(JSON.stringify(SEED_ORDERS));
+      this.users = keepDemoData ? JSON.parse(JSON.stringify(SEED_USERS)) : [];
+      this.applications = keepDemoData ? JSON.parse(JSON.stringify(SEED_APPLICATIONS)) : [];
+      this.categories = keepDemoData ? JSON.parse(JSON.stringify(SEED_CATEGORIES)) : [];
+      this.products = keepDemoData ? JSON.parse(JSON.stringify(SEED_PRODUCTS)) : [];
+      this.orders = keepDemoData ? JSON.parse(JSON.stringify(SEED_ORDERS)) : [];
+      // A production shop starts empty and gets its owner account from the
+      // environment, so the first login is a real one.
+      if (isProduction()) this.ensureOwnerAccount();
       this.payments = [];
       this.otps = [];
       this.settings = clone(DEFAULT_SETTINGS);
@@ -135,6 +152,45 @@ class DataStore {
 
     this.persistenceEnabled = isPersistenceEnabled();
     this.saver = createSaver(() => this.snapshot());
+  }
+
+  /**
+   * Guarantees the owner's own admin account exists in production (ADR-024).
+   * Credentials come from ADMIN_EMAIL / ADMIN_PASSWORD; the boot guard in
+   * runtime-mode.js refuses to start without them, so by the time this runs the
+   * values are present. An existing account is never overwritten — changing the
+   * password in the environment should not silently reset a live account.
+   */
+  ensureOwnerAccount() {
+    const { email, password, configured } = ownerAccount();
+    if (!configured) return;
+
+    const existing = this.findUserByEmail(email);
+    if (existing) {
+      // Make sure an account that exists for any reason really is the admin.
+      existing.isDemo = false;
+      if (existing.role !== 'ADMIN') {
+        existing.role = 'ADMIN';
+        existing.isWholesaleVerified = true;
+        console.warn(`[Manto Moda] نقش حساب ${email} به ADMIN ارتقا یافت (ADMIN_EMAIL).`);
+      }
+      return;
+    }
+
+    this.users.push({
+      id: `usr-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+      email,
+      phone: process.env.ADMIN_PHONE || '',
+      fullName: process.env.ADMIN_NAME || 'مدیر فروشگاه',
+      passwordHash: hashPasswordSync(password),
+      role: 'ADMIN',
+      isWholesaleVerified: true,
+      companyName: '',
+      createdAt: new Date().toISOString(),
+      isDemo: false,
+      isOwner: true
+    });
+    console.log(`[Manto Moda] حساب مدیر فروشگاه ساخته شد: ${email}`);
   }
 
   // --- Persistence ---

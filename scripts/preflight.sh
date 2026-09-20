@@ -56,6 +56,43 @@ fi
 
 if [ "${NODE_ENV:-}" = "production" ]; then ok "NODE_ENV=production"; else warn "NODE_ENV=${NODE_ENV:-development} — روی سرور باید production باشد"; fi
 
+# --- Owner account (ADR-024) -------------------------------------------------
+# The role simulator hands out an admin token without a password and the demo
+# accounts share a password published in the public repository, so a live shop
+# must have its own login and must not have the demo scaffolding switched on.
+if [ "${NODE_ENV:-}" = "production" ]; then
+  if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+    bad "ADMIN_EMAIL/ADMIN_PASSWORD تنظیم نشده — بدون حساب مدیر واقعی، سرور در حالت production بالا نمی‌آید"
+  elif [ "${#ADMIN_PASSWORD}" -lt 12 ]; then
+    bad "ADMIN_PASSWORD کوتاه است (${#ADMIN_PASSWORD} کاراکتر) — حداقل ۱۲ کاراکتر"
+  else
+    ok "حساب مدیر فروشگاه تعریف شده است ($ADMIN_EMAIL)"
+  fi
+
+  if [ "${ALLOW_DEMO_MODE:-false}" = "true" ]; then
+    bad "ALLOW_DEMO_MODE=true — شبیه‌ساز نقش فعال است و هر کسی می‌تواند توکن مدیر بگیرد! روی فروشگاه واقعی false باشد"
+  else
+    ok "شبیه‌ساز نقش (دمو) خاموش است"
+  fi
+
+  if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
+    warn "SEED_DEMO_DATA=true — کالاها، سفارش‌ها و مشتریان نمونه داخل فروشگاه واقعی بارگذاری می‌شوند"
+  fi
+else
+  warn "بدون NODE_ENV=production، شبیه‌ساز نقش و داده نمونه فعال‌اند (برای توسعه درست است، برای سرور نه)"
+fi
+
+# A snapshot carried over from a demo install may still contain demo accounts.
+if [ "${PERSIST_DATA:-false}" = "true" ]; then
+  SNAP="${DATA_DIR:-./data}/manto-moda.json"
+  if [ -f "$SNAP" ]; then
+    DEMO_USERS="$(grep -c '"isDemo": *true' "$SNAP" 2>/dev/null || echo 0)"
+    if [ "${DEMO_USERS:-0}" -gt 0 ]; then
+      warn "$DEMO_USERS حساب نمونه در فایل داده وجود دارد — در حالت production از ورود محروم می‌شوند و در اولین ذخیره حذف می‌شوند"
+    fi
+  fi
+fi
+
 head2 "۳) ماندگاری داده (مهم‌ترین مورد)"
 if [ "${PERSIST_DATA:-false}" = "true" ]; then
   ok "PERSIST_DATA=true — سفارش‌ها روی دیسک ذخیره می‌شوند"

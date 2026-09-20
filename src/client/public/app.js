@@ -185,6 +185,28 @@ async function setupRoleSwitcher() {
   });
 }
 
+/**
+ * Reads the deployment's public runtime configuration once per page load.
+ * Failure is treated as "no demo features", which is the safe default.
+ */
+async function fetchRuntimeConfig() {
+  const fallback = { demoMode: false, demoData: false, version: '' };
+  try {
+    const res = await fetch('/api/config');
+    const body = await res.json();
+    if (!body?.success) return fallback;
+    const cfg = { ...fallback, ...body.data };
+
+    const switcher = document.getElementById('role-switcher');
+    if (switcher) switcher.classList.toggle('hidden', !cfg.demoMode);
+    if (switcher && !cfg.demoMode) switcher.classList.remove('flex');
+
+    return cfg;
+  } catch {
+    return fallback;
+  }
+}
+
 function updateUserProfileUI() {
   const nameEl = document.getElementById('user-display-name');
   const roleEl = document.getElementById('user-role-label');
@@ -2032,15 +2054,21 @@ async function initApp() {
     return;
   }
 
-  await setupRoleSwitcher();
-  // Initialize with regular customer session
-  const initialRoleRes = await apiFetch('/api/auth/switch-role', {
-    method: 'POST',
-    body: JSON.stringify({ targetRole: 'REGULAR' })
-  });
-  if (initialRoleRes.success) {
-    state.token = initialRoleRes.data.token;
-    state.currentUser = initialRoleRes.data.user;
+  // Ask the server what this deployment allows. On a live shop demoMode is
+  // false: the role simulator stays hidden and nobody is signed in silently —
+  // a visitor either logs in or browses as a guest (ADR-024).
+  const runtime = await fetchRuntimeConfig();
+
+  if (runtime.demoMode) {
+    await setupRoleSwitcher();
+    const initialRoleRes = await apiFetch('/api/auth/switch-role', {
+      method: 'POST',
+      body: JSON.stringify({ targetRole: 'REGULAR' })
+    });
+    if (initialRoleRes.success) {
+      state.token = initialRoleRes.data.token;
+      state.currentUser = initialRoleRes.data.user;
+    }
   }
   updateUserProfileUI();
   updateCartBadge();

@@ -6,6 +6,14 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 13: Full Review — and the launch-blocker it found (ADR-024).** A whole-project review (all executable skill scanners plus a hand audit of the running server) found that the demo scaffolding was still reachable on a live shop: an anonymous `POST /api/auth/switch-role` returned an **admin token**, and the sample accounts (shared password, published in this repository) logged in successfully.
+  - [x] Role simulator: 404 in production, hidden from the UI via `/api/config`; opt-in only through `ALLOW_DEMO_MODE=true`, which preflight reports as a blocker.
+  - [x] Demo accounts: never created in production, filtered out of carried-over snapshots, and refused by the login route *and* the auth middleware; refusals are indistinguishable from a wrong password.
+  - [x] Owner account from `ADMIN_EMAIL`/`ADMIN_PASSWORD`; production refuses to boot without it; `server-install.sh` generates it and prints the password once; `preflight.sh` blocks on a missing/weak account.
+  - [x] A live shop starts empty — no sample catalogue, orders or customers, and no invented revenue on the dashboard.
+  - [x] Version drift removed: `/api/health` reads `package.json` instead of a hard-coded string that had fallen a release behind.
+  - [x] **Level 10** test suite (`tests/production-guards.test.js`): boots real production servers and asserts every claim above, plus that development/test still keep the full demo experience.
+  - [x] Fixed the CI finding from the `devops-automator` skill (missing `concurrency` control) and counted the suites correctly (10).
 - [x] **Phase 12: Security Hardening Driven by the Skills Audit** — the vendored Claude skills were executed against `src/` and the two defects they surfaced were fixed and locked down (ADR-022, ADR-023).
   - [x] Run the skill scanners for real: `.claude/skills/security-auditor/scripts/owasp-check.py src` and `detect-secrets.sh`, plus `technical-writer/validate-docs.sh` — results triaged, false positives recorded rather than "fixed".
   - [x] **Fix: order-number collisions.** `Math.random()` gave order numbers a 9,000-value space (collision expected after ~110 orders) while invoices are looked up *by number*; numbers now come from a persisted monotonic sequence with a random start, and product/coupon/audit ids and the mock payment reference use `crypto`.

@@ -94,8 +94,10 @@
         <span class="hidden sm:inline text-slate-300">عرضه مستقیم مانتو و ترنچ‌کت بهاره و پاییزه — ارسال سریع به سراسر کشور</span>
       </div>
       
-      <!-- QUICK ROLE SWITCHER (DEVELOPMENT & EVALUATION TOOL) -->
-      <div class="flex items-center gap-2 text-xs">
+      <!-- QUICK ROLE SWITCHER (DEVELOPMENT & EVALUATION TOOL)
+           Hidden unless the server reports demoMode — on a live shop the back
+           office must not be advertised in a public dropdown (ADR-024). -->
+      <div id="role-switcher" class="hidden flex items-center gap-2 text-xs">
         <span class="text-slate-400">شبیه‌ساز نقش کاربری:</span>
         <select id="role-switcher-select" class="bg-slate-800 text-amber-300 font-medium px-2.5 py-1 rounded border border-slate-700 text-xs focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer" aria-label="انتخاب نقش کاربری برای تست سیستم">
           <option value="GUEST">👤 کاربر مهمان (Guest)</option>
