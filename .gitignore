@@ -49,3 +49,6 @@ Thumbs.db
 *.swp
 *.swo
 .npm/
+
+# Local push credential — never commit this
+.github-token

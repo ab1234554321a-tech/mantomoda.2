@@ -32,12 +32,27 @@ warn() { printf '  \033[33m▲\033[0m %s\n' "$1"; }
 die()  { printf '\n\033[31m✘ %s\033[0m\n' "$1" >&2; exit 1; }
 
 # --- Token -------------------------------------------------------------------
+# Three ways in, in this order: $GITHUB_TOKEN / first argument, a token file
+# (so it never lands in the shell history), or a hidden prompt.
 TOKEN="${GITHUB_TOKEN:-${1:-}}"
+TOKEN_FILE=""
+for candidate in "$PWD/.github-token" "$HOME/.github-token"; do
+  if [ -z "$TOKEN" ] && [ -s "$candidate" ]; then
+    TOKEN="$(tr -d '[:space:]' < "$candidate")"
+    TOKEN_FILE="$candidate"
+  fi
+done
+if [ -n "$TOKEN_FILE" ]; then
+  ok "توکن از فایل خوانده شد: $TOKEN_FILE"
+  echo "  (این فایل در .gitignore است و هرگز کامیت نمی‌شود؛ بعد از ارسال می‌توانی پاکش کنی)"
+fi
 
 if [ -z "$TOKEN" ]; then
   say "اعتبارنامه گیت‌هاب لازم است"
-  echo "  یک توکن fine-grained بساز (فقط برای همین مخزن، دسترسی Contents: Read and write):"
-  echo "  https://github.com/settings/tokens?type=beta"
+  echo "  ساده‌ترین راه (لینک از قبل پر شده — فقط Generate و کپی):"
+  echo "    https://github.com/settings/tokens/new?description=mantomoda-push&scopes=repo"
+  echo "  یا نسخه دقیق‌تر (فقط همین مخزن، Contents: Read and write):"
+  echo "    https://github.com/settings/personal-access-tokens/new?name=mantomoda"
   printf '  توکن را بچسبان و Enter بزن (چیزی نمایش داده نمی‌شود): '
   read -rs TOKEN
   echo
