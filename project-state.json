@@ -31,7 +31,11 @@
     "Payment gateway integration (BL-006 / ADR-008): pluggable adapter layer with Zarinpal, PENDING→PAID order lifecycle, idempotent server-side verification, BOLA-safe endpoints",
     "SMS OTP verification (BL-007 / TD-003 / ADR-009): pluggable adapter layer with Kavehnegar, hashed single-use codes, TTL, attempt lockout and per-number rate limits",
     "Production startup guards: app refuses to start with an unset/unconfigured payment or SMS provider; mock providers require explicit ALLOW_MOCK_PROVIDERS=true",
-    "Automated test gate extended to 6 suites (Level 5 payment, Level 6 OTP)"
+    "Automated test gate extended to 6 suites (Level 5 payment, Level 6 OTP)",
+    "CI pipeline added (.github/workflows/ci.yml): 6 suites on Node 20/22 + blocking dependency audit + secrets check",
+    "Dependency vulnerabilities remediated: npm audit reports 0 vulnerabilities (was 3 moderate)",
+    "Documentation drift fixed (Phase 9.1): README/ARCHITECTURE now match the Vanilla JS SPA and the real test gate",
+    "Improvement plan published (IMPROVEMENT_PLAN.md) with evidence-based P0/P1/P2 gaps and a 10-point ready-to-sell Definition of Done"
   ],
   "inProgress": [
     "Persistent PostgreSQL database migration (BL-005)"
@@ -39,6 +43,21 @@
   "blocked": [],
   "knownBugs": [],
   "risks": [
+    {
+      "risk": "Inventory is neither checked nor decremented at checkout — orders can be placed for unavailable stock",
+      "severity": "HIGH",
+      "mitigation": "Scheduled first in Phase 9.5 (P0 in IMPROVEMENT_PLAN.md)"
+    },
+    {
+      "risk": "In-memory store loses all users, orders, OTP codes and payment sessions on every restart",
+      "severity": "HIGH",
+      "mitigation": "Interim atomic file-backed store behind the same store interface, then PostgreSQL/Prisma (BL-005)"
+    },
+    {
+      "risk": "Customers receive no notification when order status changes",
+      "severity": "MEDIUM",
+      "mitigation": "Wire the existing Kavehnegar SMS adapter to the order status transition"
+    },
     {
       "risk": "Persistent SQL DB connection for multi-replica horizontal scaling",
       "severity": "MEDIUM",
@@ -50,7 +69,7 @@
       "mitigation": "Adapters are complete and unit-tested against the provider contracts; mock providers allow full end-to-end flow testing offline (explicitly refused in production)"
     }
   ],
-  "nextRecommendedStep": "Wire persistent PostgreSQL database with Prisma ORM (BL-005); live payment and OTP activation only needs merchant credentials in .env.",
+  "nextRecommendedStep": "Phase 9.5 — P0 sales-readiness from IMPROVEMENT_PLAN.md: inventory integrity (no overselling), SMS order-status notifications, real order state machine, and data persistence.",
   "humanDecisionsRequired": [
     "Provide ZARINPAL_MERCHANT_ID (business registration with the PSP is a merchant-side process)",
     "Provide KAVENEGAR_API_KEY and the approved OTP pattern name (KAVENEGAR_OTP_TEMPLATE)"

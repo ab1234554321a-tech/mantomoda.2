@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`IMPROVEMENT_PLAN.md`**: Evidence-based improvement plan with a 10-point "ready to sell" Definition of Done and a skill→task mapping. Records the audit findings that block real sales (inventory integrity, data persistence, order notifications).
+- **CI pipeline (`.github/workflows/ci.yml`)**: Runs the 6 test suites on Node 20 and 22, a blocking dependency audit, a committed-secrets check, and state-file validation. Closes the long-standing "GitHub Actions CI pending PAT" gap.
+
+### Fixed
+- **Dependency vulnerabilities**: `npm audit` reported 3 moderate advisories (`qs` via express/body-parser). Remediated — `npm audit --omit=dev` now reports **0 vulnerabilities**.
+- **Documentation drift (Phase 9.1)**: `README.md` and `ARCHITECTURE.md` described a React 18 / TypeScript / Vite / Vitest / Supertest stack that was never built. Both now describe the shipped Vanilla JS SPA and the actual 6-suite `npm test` gate; the React/Next.js migration is documented as a *planned* option (`TD-005`).
+
+### Changed
 - **Curated Claude Skills Toolchain (ADR-006)**: Reviewed all 188 skills of the MIT-licensed `erichowens/some_claude_skills` collection and adopted the **69** that map to roadmap phases, Agent Roles (`agents/01..13`), and open backlog items. Vendored at `.claude/skills/` so every clone has them; installable to the user profile via `scripts/install-claude-skills.sh` (macOS/Linux) or `install-skills.bat` (Windows, double-click).
 - **`SKILLS.md`**: Skill-to-roadmap-phase and skill-to-agent-role mapping (Phase 9.1→10, all 13 agent roles, UI/UX, SEO, AI).
 - **`scripts/install-claude-skills.sh`**: Group-based installer/uninstaller with `--group`, `--into-repo`, `--list`, `--force`, `--uninstall` flags. Validates every installed skill has a `SKILL.md`.

@@ -9,7 +9,7 @@ This document defines the complete architectural design, domain models, database
 ```
                         ┌────────────────────────┐
                         │      Client Web App    │
-                        │ (React / Next.js / UI) │
+                        │  (Vanilla JS SPA + UI) │
                         │  Mobile First Design   │
                         └───────────┬────────────┘
                                     │ HTTPS / JSON API
@@ -61,10 +61,9 @@ manto-moda/
 │   │   │   ├── Cart & Checkout
 │   │   │   ├── UserProfile & Orders
 │   │   │   └── AdminDashboard
-│   │   ├── hooks/               # Custom React hooks (useAuth, useCart, useProducts)
-│   │   ├── context/             # React contexts (AuthContext, CartContext, ThemeContext)
-│   │   ├── lib/                 # Client utilities & API client (fetcher, formatters)
-│   │   └── types/               # TypeScript interfaces & types for frontend
+│   │   ├── app.js               # Single-file SPA controller (routing, state, views, API client)
+│   │   ├── index.html           # RTL shell: header, views, cart drawer, modals
+│   │   └── styles.css           # Brand tokens & RTL helpers (Tailwind handles the rest)
 │   │
 │   ├── server/                  # Backend API & Business Logic
 │   │   ├── config/              # Environment config & constants

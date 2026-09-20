@@ -1,0 +1,70 @@
+name: CI — Quality & Security Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (6 suites) + Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies (clean, lockfile-exact)
+        run: npm ci
+
+      - name: Dependency vulnerability audit (blocking)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Run the automated quality & security gate
+        run: npm test
+        env:
+          NODE_ENV: test
+          # Tests generate their own secrets; placeholders below are never used in production.
+          JWT_SECRET: ci_only_secret_key_that_is_long_enough_for_validation_1234
+
+      - name: Verify no secrets were committed
+        run: |
+          if git ls-files | grep -E '\.env$|\.env\.(local|production)$'; then
+            echo "::error::A .env file is tracked in git. Remove it and rotate the credentials."
+            exit 1
+          fi
+          echo "No tracked .env files. OK."
+
+      - name: Verify project state files are consistent JSON
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('project-state.json','utf8')); console.log('project-state.json is valid')"
+          node -e "JSON.parse(require('fs').readFileSync('mcp.json','utf8')); console.log('mcp.json is valid')"
+
+  skills-available:
+    name: Claude Skills present on clone
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the curated skill set is vendored
+        run: |
+          count=$(find .claude/skills -name SKILL.md | wc -l)
+          echo "Skills vendored: $count"
+          if [ "$count" -lt 60 ]; then
+            echo "::error::Expected the curated skill set to be vendored in .claude/skills (found $count)."
+            exit 1
+          fi

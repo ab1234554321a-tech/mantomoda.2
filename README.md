@@ -52,10 +52,14 @@
 
 ## ⚙️ Technology Stack
 
-- **Frontend**: React 18, TypeScript, TailwindCSS, Lucide Icons, Vite
-- **Backend**: Node.js, Express, TypeScript, Zod, JWT, bcrypt
+- **Frontend**: Vanilla JS SPA (`src/client/public/app.js`) + TailwindCSS, mobile-first Persian RTL
+- **Backend**: Node.js, Express, Zod, JWT (HMAC-SHA256), bcrypt
 - **Payments**: Zarinpal IPG behind a pluggable adapter (ADR-008) — sandbox-aware
 - **SMS / OTP**: Kavehnegar behind a pluggable adapter (ADR-009) — hashed, single-use, rate-limited codes
-- **Testing**: Vitest, Supertest
-- **State Management**: React Context / Hooks
+- **Testing**: 6 automated suites via `npm test` (Node's built-in `assert` + HTTP-level flow checks)
+- **State Management**: Single in-memory client store (no framework), server is the source of truth for prices
+
+> **Roadmap note (Phase 9.1)**: the docs previously described a React/TypeScript/Vite stack that was never
+> built. The shipped client is a focused Vanilla JS SPA. A React/Next.js migration remains a *planned*
+> option (`TD-005`) for SSR/SEO, not a description of today's code.
 - **Architecture**: Modular Controller-Service-Repository Pattern with RBAC Guards

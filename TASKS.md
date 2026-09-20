@@ -45,6 +45,15 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
   - [x] Hardened OTP service: hashed storage, single-use, TTL, attempt lockout, resend + hourly rate limits.
   - [x] Passwordless mobile login/registration endpoints.
   - [ ] Provide `KAVENEGAR_API_KEY` and the approved pattern name for live OTP delivery.
+- [x] **Phase 9.1: Documentation Drift Fixed**
+  - [x] `README.md` + `ARCHITECTURE.md` aligned with the Vanilla JS SPA reality (React/TS/Vite claims removed).
+  - [x] Testing stack statement corrected to the actual 6-suite `npm test` gate.
+- [x] **CI Pipeline Added (`.github/workflows/ci.yml`)**
+  - [x] 6 test suites on Node 20 + 22, blocking `npm audit`, committed-secrets check, state-file validation.
+- [x] **Dependency Remediation**
+  - [x] 3 moderate `qs` advisories fixed; `npm audit` now reports 0 vulnerabilities.
+- [x] **Improvement Plan Published (`IMPROVEMENT_PLAN.md`)**
+  - [x] Evidence-based audit of P0/P1/P2 gaps with a 10-point "ready to sell" Definition of Done.
 - [x] **AI Toolchain: Curated Claude Skills (ADR-006)**
   - [x] Audited the full 188-skill upstream collection and selected the 69 relevant to this roadmap.
   - [x] Vendored skills at `.claude/skills/` + cross-platform installers (`scripts/install-claude-skills.sh`, `install-skills.bat`).
@@ -62,6 +71,11 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 2. In Progress (در حال اجرا)
 
+- [ ] **Phase 9.5: P0 Sales-Readiness (from `IMPROVEMENT_PLAN.md`)** ← NEXT
+  - [ ] Inventory integrity: validate + decrement stock atomically at checkout, restore on cancellation (prevents overselling).
+  - [ ] Order status change notifications via the Kavehnegar SMS adapter (already built).
+  - [ ] Real order state machine (allowed transitions + audit trail).
+  - [ ] Data persistence so a restart does not erase orders.
 - [ ] **Phase 7 & 9: Security Hardening & Production Configuration**
   - [ ] Environment variable template (`.env.example`).
   - [ ] Production containerization configuration (`Dockerfile`).
