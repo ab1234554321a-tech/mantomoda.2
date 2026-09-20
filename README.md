@@ -198,3 +198,9 @@ Pushes the current commit to the GitHub remote and prints the local and remote H
 is required because GitHub will not accept an upload without one — it is the only step in this
 project that cannot be automated away, and it is a one-time copy-paste. GitHub is a *code backup*; the
 shop itself goes online with `scripts/server-install.sh` (section 11).
+
+**Token scopes:** pushing ordinary files needs `public_repo` (public repository) or `repo`; **updating
+anything under `.github/workflows/` additionally needs the `workflow` checkbox**, and without it GitHub
+rejects the whole push with a message that reads like a generic permission error. The script checks the
+token's scopes against what is actually being sent and stops with the exact link before trying, so this
+can no longer waste a round trip.
