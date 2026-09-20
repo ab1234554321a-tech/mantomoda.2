@@ -131,9 +131,13 @@ if command -v curl >/dev/null 2>&1; then
     ok "دسترسی‌های توکن: $SCOPES"
     TOUCHES_WORKFLOWS="$(git log --name-only --format= "$REPO_URL_REF" 2>/dev/null | grep -c '^\.github/workflows/' || true)"
     if [ "${TOUCHES_WORKFLOWS:-0}" -gt 0 ] && ! printf '%s' "$SCOPES" | grep -q 'workflow'; then
+      # Least privilege: a public repository needs `public_repo`, not full `repo`.
+      VISIBILITY="$(curl -s "https://api.github.com/repos/$(printf '%s' "$REPO_URL" | sed -E 's#.*github\.com[/:]([^/]+)/([^/]+?)(\.git)?$#\1/\2#')" 2>/dev/null | grep -o '"private": *[a-z]*' | head -1 || true)"
+      BASE_SCOPE="public_repo"
+      case "$VISIBILITY" in *true*) BASE_SCOPE="repo" ;; esac
       warn "در این ارسال فایل .github/workflows/ تغییر کرده، ولی توکن دسترسی workflow ندارد"
-      die "همان توکن را با دسترسی workflow بساز (یک کلیک، از قبل پر شده):
-     https://github.com/settings/tokens/new?description=mantomoda-push&scopes=repo,workflow"
+      die "همان توکن را با دو دسترسی $BASE_SCOPE و workflow بساز (لینک از قبل پر شده — فقط Generate و کپی):
+     https://github.com/settings/tokens/new?description=mantomoda-push&scopes=$BASE_SCOPE,workflow"
     fi
   fi
 fi
