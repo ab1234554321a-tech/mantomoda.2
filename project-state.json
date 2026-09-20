@@ -1,10 +1,10 @@
 {
   "projectName": "Manto Moda",
   "version": "0.3.0-rc1",
-  "lastUpdated": "2026-09-20T12:00:00.000Z",
+  "lastUpdated": "2026-09-20",
   "activeBranch": "main",
-  "currentPhase": "Phase 9 — Payment Gateway & SMS OTP integrated (adapters complete, live credentials pending); PostgreSQL/Prisma next",
-  "overallProgressPercent": 88,
+  "currentPhase": "Phase 9.5 — Revenue-readiness hardening (COMPLETE)",
+  "overallProgressPercent": 96,
   "healthScore": 94.4,
   "completed": [
     "Git repository initialization & Source of Truth governance",
@@ -35,44 +35,53 @@
     "CI pipeline added (.github/workflows/ci.yml): 6 suites on Node 20/22 + blocking dependency audit + secrets check",
     "Dependency vulnerabilities remediated: npm audit reports 0 vulnerabilities (was 3 moderate)",
     "Documentation drift fixed (Phase 9.1): README/ARCHITECTURE now match the Vanilla JS SPA and the real test gate",
-    "Improvement plan published (IMPROVEMENT_PLAN.md) with evidence-based P0/P1/P2 gaps and a 10-point ready-to-sell Definition of Done"
+    "Improvement plan published (IMPROVEMENT_PLAN.md) with evidence-based P0/P1/P2 gaps and a 10-point ready-to-sell Definition of Done",
+    "Phase 9.5 / P0: Data persistence — atomic JSON snapshot (ADR-010), flush on shutdown, disabled under test",
+    "Phase 9.5 / P0: Inventory integrity — no overselling, 409 with availability, stock restored on cancellation (ADR-011)",
+    "Phase 9.5 / P0: Order state machine with per-transition audit trail; admin UI offers only legal steps (ADR-011)",
+    "Phase 9.5 / P0: Persian transactional SMS for order placement, payment and every status change (ADR-012)",
+    "Phase 9.5 / P1: Product image upload with WebP conversion, thumbnails and content sniffing (ADR-013)",
+    "Phase 9.5 / P1: Catalog pagination with bounded responses (ADR-014)",
+    "Phase 9.5 / P1: SEO — robots.txt, data-driven sitemap.xml, pre-rendered product pages with OG + Product JSON-LD (ADR-015)",
+    "Phase 9.5 / P1: Accessibility baseline enforced by npm run a11y (17 checks) in CI (ADR-016)",
+    "Phase 9.5 / P2: Backup/restore script with integrity verification and rotation; process-level safety nets; app/index split enabling real HTTP tests",
+    "Phase 9.5: Test suite Level 7 (supertest) — inventory, lifecycle, notifications, pagination, SEO, uploads, persistence isolation"
   ],
-  "inProgress": [
-    "Persistent PostgreSQL database migration (BL-005)"
-  ],
+  "inProgress": [],
   "blocked": [],
   "knownBugs": [],
   "risks": [
     {
-      "risk": "Inventory is neither checked nor decremented at checkout — orders can be placed for unavailable stock",
-      "severity": "HIGH",
-      "mitigation": "Scheduled first in Phase 9.5 (P0 in IMPROVEMENT_PLAN.md)"
-    },
-    {
-      "risk": "In-memory store loses all users, orders, OTP codes and payment sessions on every restart",
-      "severity": "HIGH",
-      "mitigation": "Interim atomic file-backed store behind the same store interface, then PostgreSQL/Prisma (BL-005)"
-    },
-    {
-      "risk": "Customers receive no notification when order status changes",
+      "risk": "Snapshot persistence is single-process and whole-file: two app instances (or a container restarted mid-write on an exotic filesystem) can diverge",
       "severity": "MEDIUM",
-      "mitigation": "Wire the existing Kavehnegar SMS adapter to the order status transition"
+      "mitigation": "Documented in ADR-010; migration path is TD-006 (same store API on a real database)"
     },
     {
-      "risk": "Persistent SQL DB connection for multi-replica horizontal scaling",
+      "risk": "Uploaded product images live on local disk (UPLOAD_DIR) and are lost if the deploy target is ephemeral",
       "severity": "MEDIUM",
-      "mitigation": "Store pattern abstracts data layer for straightforward Prisma / PostgreSQL drop-in"
+      "mitigation": "Documented in ADR-013; must be covered by backups (scripts/backup.sh) or moved to object storage (TD-007)"
     },
     {
-      "risk": "Live payment/SMS credentials not yet supplied",
+      "risk": "Live payment gateway and SMS panel credentials are still not configured",
+      "severity": "MEDIUM",
+      "mitigation": "Code paths are complete and adapter-tested; ZARINPAL_MERCHANT_ID and KAVENEGAR_API_KEY are business-side inputs (deferred by the owner)"
+    },
+    {
+      "risk": "Accessibility gate is static (markup-level); contrast and screen-reader flow still need a manual pass",
       "severity": "LOW",
-      "mitigation": "Adapters are complete and unit-tested against the provider contracts; mock providers allow full end-to-end flow testing offline (explicitly refused in production)"
+      "mitigation": "Noted in ADR-016; manual pass is item 10 of the ready-to-sell DoD"
+    },
+    {
+      "risk": "Kavenegar free-form SMS (sendMessage) may require a pre-approved pattern/template on the panel",
+      "severity": "LOW",
+      "mitigation": "Adapter isolates the call; template name is configuration, not code"
     }
   ],
-  "nextRecommendedStep": "Phase 9.5 — P0 sales-readiness from IMPROVEMENT_PLAN.md: inventory integrity (no overselling), SMS order-status notifications, real order state machine, and data persistence.",
+  "nextRecommendedStep": "Phase 10: go-live checklist — set PERSIST_DATA=true + credentials on the host, schedule scripts/backup.sh, then run the 10-point ready-to-sell DoD in IMPROVEMENT_PLAN.md",
   "humanDecisionsRequired": [
-    "Provide ZARINPAL_MERCHANT_ID (business registration with the PSP is a merchant-side process)",
-    "Provide KAVENEGAR_API_KEY and the approved OTP pattern name (KAVENEGAR_OTP_TEMPLATE)"
+    "Provide ZARINPAL_MERCHANT_ID (and KAVENEGAR_API_KEY + approved sender/pattern) when payment activation is resumed",
+    "Confirm the production host and that its disk (or a mounted volume) is used for DATA_DIR and UPLOAD_DIR",
+    "Confirm PUBLIC_SITE_URL (the real domain) for canonical URLs and sitemap entries"
   ],
   "aiToolchain": {
     "skillsSource": "github.com/erichowens/some_claude_skills (MIT)",

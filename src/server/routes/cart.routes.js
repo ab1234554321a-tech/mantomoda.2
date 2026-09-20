@@ -18,7 +18,9 @@ router.post('/calculate', (req, res) => {
         shippingFee: 0,
         payableAmount: 0,
         isWholesaleOrder: false,
-        wholesaleNotices: []
+        wholesaleNotices: [],
+        stockNotices: [],
+        hasStockProblem: false
       }
     });
   }
@@ -33,6 +35,7 @@ router.post('/calculate', (req, res) => {
   let totalQuantity = 0;
   const processedItems = [];
   const wholesaleNotices = [];
+  const stockNotices = [];
 
   for (const item of items) {
     const product = db.findProductById(item.productId);
@@ -65,6 +68,25 @@ router.post('/calculate', (req, res) => {
       }
     }
 
+    // Availability (ADR-011): surface stock problems before checkout, so the
+    // customer finds out here rather than at the payment step.
+    const availableStock = variant ? Number(variant.stock) || 0 : 0;
+    const hasStockProblem = availableStock < qty;
+    if (hasStockProblem) {
+      stockNotices.push({
+        productId: product.id,
+        variantId: variant ? variant.id : null,
+        productTitle: product.title,
+        color: variant ? variant.color : '',
+        size: variant ? variant.size : '',
+        requested: qty,
+        available: availableStock,
+        message: availableStock === 0
+          ? `«${product.title}» (${variant ? variant.color : ''} - سایز ${variant ? variant.size : ''}) در حال حاضر موجود نیست.`
+          : `از «${product.title}» فقط ${availableStock} عدد موجود است (تعداد درخواستی: ${qty}).`
+      });
+    }
+
     const itemTotal = appliedPrice * qty;
     const itemSavings = unitSavings * qty;
 
@@ -83,6 +105,8 @@ router.post('/calculate', (req, res) => {
       retailPrice: product.retailPrice,
       wholesalePrice: isWholesaleUser ? product.wholesalePrice : undefined,
       isWholesalePriceApplied,
+      availableStock,
+      hasStockProblem,
       itemTotal,
       itemSavings
     });
@@ -101,7 +125,9 @@ router.post('/calculate', (req, res) => {
       shippingFee,
       payableAmount,
       isWholesaleOrder: isWholesaleUser && processedItems.some(i => i.isWholesalePriceApplied),
-      wholesaleNotices
+      wholesaleNotices,
+      stockNotices,
+      hasStockProblem: stockNotices.length > 0
     }
   });
 });

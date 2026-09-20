@@ -14,7 +14,9 @@
     "agent:research": "node skills/design-research.js",
     "agent:sync": "node skills/state-sync.js",
     "agent:all": "node skills/orchestrator.js",
-    "agent:benchmark": "node research/benchmarks/compare-reference-sites.js"
+    "agent:benchmark": "node research/benchmarks/compare-reference-sites.js",
+    "a11y": "node scripts/a11y-audit.mjs",
+    "backup": "bash scripts/backup.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
@@ -25,6 +27,11 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "sharp": "^0.35.4",
     "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

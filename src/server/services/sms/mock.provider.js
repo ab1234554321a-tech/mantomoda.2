@@ -20,6 +20,7 @@ export const mockSmsProvider = {
 
   async sendOtp({ mobile, code, template }) {
     const message = {
+      kind: 'OTP',
       to: mobile,
       code,
       template: template || 'mock-template',
@@ -35,6 +36,33 @@ export const mockSmsProvider = {
     console.log(`[MOCK SMS] -> ${mobile} | code: ${code} | template: ${message.template}`);
 
     return { ok: true, messageId: message.messageId, provider: 'mock', raw: message };
+  },
+
+  /**
+   * Free-form transactional message (order status updates).
+   * Numbers starting with 0900 simulate a delivery failure so tests can prove
+   * that a failed notification never breaks the business operation.
+   */
+  async sendMessage({ mobile, message }) {
+    if (String(mobile || '').startsWith('0900')) {
+      const error = new Error('mock delivery failure (simulated for numbers starting with 0900)');
+      error.code = 'SMS_PROVIDER_ERROR';
+      error.statusCode = 502;
+      throw error;
+    }
+
+    const entry = {
+      kind: 'MESSAGE',
+      to: mobile,
+      message,
+      sentAt: new Date().toISOString(),
+      messageId: `mock-msg-${outbox.length + 1}`
+    };
+
+    outbox.push(entry);
+    console.log(`[MOCK SMS] -> ${mobile} | ${message}`);
+
+    return { ok: true, messageId: entry.messageId, provider: 'mock', raw: entry };
   },
 
   /** Test helper — returns a copy of everything "sent". */

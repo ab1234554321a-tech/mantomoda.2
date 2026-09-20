@@ -127,3 +127,152 @@ This log contains the record of all major architectural and technical decisions 
 - **Consequences**: Registration/login by mobile works end-to-end (`POST /api/auth/otp/request`,
   `POST /api/auth/otp/verify`). Swapping panels later is one adapter file + one env change.
   The API key and the pre-approved pattern name (`KAVENEGAR_OTP_TEMPLATE`) are business-side inputs.
+
+---
+
+## ADR-010: File-Backed Snapshot Persistence (in-process store)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P0-2. The store was a pure in-memory object: every restart
+  (deploy, crash, `pm2 restart`) silently erased all orders, users and stock changes. For a shop that
+  already takes money this is the most expensive defect in the codebase — a paying customer's order
+  simply disappears. A full database (PostgreSQL/MongoDB) would need a server, backups and
+  operational knowledge the owner does not have.
+- **Decision**: Keep the in-process store as the single write path, but persist it as an **atomic
+  JSON snapshot** (`src/server/db/persistence.js`):
+  - Writes go to a temp file, are `fsync`ed, then `rename`d over the target — a crash mid-write can
+    never leave a half-written, unloadable file.
+  - Saves are **debounced** (`PERSIST_DEBOUNCE_MS`, default 150 ms) so a burst of writes costs one
+    disk hit; `db.flush()` is called on SIGTERM/SIGINT and on uncaught exceptions.
+  - **Disabled automatically** when `NODE_ENV=test` or `PERSIST_DATA=false`; tests must never touch
+    real data (this was verified — a leak was found and fixed).
+  - `RESET_DATA=true` re-seeds the demo catalog deliberately.
+  - **OTP records are never restored**: they are short-lived credentials, so restoring them would
+    resurrect expired codes. This is intentional, not an oversight.
+- **Consequences**: Data survives restarts with zero new infrastructure, and the snapshot file is a
+  plain JSON that can be inspected or hand-edited. Ceiling: this is single-process, whole-file
+  persistence — it does **not** support multiple app instances or partial writes. Migration path when
+  concurrency or volume demands it: implement the same method surface on a real DB (the routes never
+  see storage details), which is registered as `TD-006`.
+
+---
+
+## ADR-011: Inventory Integrity and an Enforced Order State Machine
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P0-1/P0-4. Two production incidents were possible:
+  (a) nothing decremented variant stock on checkout, so the shop could sell the same last item to ten
+  customers; (b) the admin status endpoint accepted any of six statuses at any time, so an order could
+  jump from `PENDING` straight to `DELIVERED` with no record of who changed what.
+- **Decision**:
+  - **Validate-then-decrement** in one synchronous, non-`await`ing step (`db.reserveStock`) so two
+    concurrent checkouts cannot interleave between the check and the write. If a single line is short,
+    nothing is decremented and the request returns **409 `INSUFFICIENT_STOCK`** with per-line
+    `requested` / `available` numbers.
+  - Cancelling an order returns the reserved stock to the catalog (`db.releaseStock`).
+  - The cart endpoint reports availability **before** checkout (`hasStockProblem`, `stockNotices`), so
+    the customer is warned at the cart instead of being rejected at payment.
+  - Order lifecycle is an explicit map (`ORDER_STATUS_TRANSITIONS`): `PENDING → CONFIRMED|CANCELLED`,
+    `CONFIRMED → PROCESSING|CANCELLED`, `PROCESSING → SHIPPED|CANCELLED`, `SHIPPED → DELIVERED`;
+    `DELIVERED` and `CANCELLED` are terminal. An illegal jump returns **409
+    `INVALID_STATUS_TRANSITION`** *with the list of legal next steps*.
+  - Every transition appends `{from, to, at, by, note}` to `order.statusHistory` — an audit trail that
+    answers "who cancelled this order, and when?".
+- **Consequences**: Overselling is impossible from the API surface, and the admin panel only offers
+  legal next steps (the UI mirrors the same map). The remaining ceiling: stock is per-variant and
+  global, not per-warehouse (`BACKLOG` item).
+
+---
+
+## ADR-012: Transactional SMS for Order Lifecycle (customer notifications)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P0-3. The shop had an SMS provider wired for OTP only. Every
+  "where is my order?" phone call is a support cost; the Iranian market expectation is a Persian SMS
+  at placement and at each status change.
+- **Decision**: `src/server/services/notification.service.js` sends Persian messages for
+  `ORDER_PLACED`, `PAID`, `CONFIRMED`, `PROCESSING`, `SHIPPED`, `DELIVERED` and `CANCELLED` through the
+  same pluggable provider as OTP (`sendMessage` added to the provider contract).
+  **A notification never blocks or fails the operation that triggered it**: sending is
+  fire-and-forget, failures are caught, logged and written to `order.notifications[]` with the error,
+  so a dead gateway degrades into a visible record instead of a failed checkout or a failed admin
+  action.
+- **Consequences**: Customers are informed automatically; the admin panel shows how many notices were
+  delivered and how many failed. Cost control: notifications are per-order, not per-page-view, and
+  the Kavehnegar sender/credit is the only running expense.
+
+---
+
+## ADR-013: Server-Side Product Image Upload with WebP Normalisation
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P1-5. Products could only reference an external image URL
+  (all demo data points at Unsplash). A boutique cannot run without uploading its own photos, and
+  linking to third-party image hosts is both fragile and a licensing risk.
+- **Decision**: `POST /api/admin/products/:id/images` (multipart, admin-only) with layered hardening:
+  MIME allowlist → size ceiling (5 MB) → **real decode via `sharp`** (a text file renamed `.png` is
+  rejected with `INVALID_IMAGE_CONTENT`) → re-encode to **WebP** at 1200 px plus a 400 px thumbnail →
+  store under generated filenames only. Re-encoding also strips EXIF/GPS metadata. Deletion removes
+  the file from disk and is guarded against path traversal.
+- **Consequences**: The owner uploads photos from the admin panel; catalog pages get
+  `loading="lazy"` images and thumbnails for the grid. Storage is a local directory (`UPLOAD_DIR`),
+  which must be included in backups and, for multi-instance hosting, replaced by object storage
+  (`TD-007`).
+
+---
+
+## ADR-014: Paginated Catalog API (bounded responses)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P1-6. `GET /api/products` returned the entire catalog. A fashion
+  catalog grows into the hundreds; shipping every product (with all variants and descriptions) to
+  every visitor is megabytes over a mobile connection — the dominant audience here.
+- **Decision**: `page` / `limit` query parameters with a default page size of 12 and a hard cap of 60;
+  the response carries `meta: {page, limit, total, totalPages, hasMore}` and the storefront renders a
+  "show more" control with an `X of Y` counter. Omitting `page`/`limit` keeps the legacy
+  full-list behaviour so no existing client breaks.
+- **Consequences**: First paint is small and predictable; sorting is applied to the returned page
+  (documented limitation — a large catalog would need server-side sorting inside the query).
+
+---
+
+## ADR-015: SEO via Server-Side Pre-rendering of Product Pages
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P1-4. The storefront is a Vanilla JS SPA with a single static
+  `index.html`: search engines saw one page with one meta description and no product data. In Iran
+  most traffic arrives from Instagram and Google, where a link without OpenGraph/price data simply
+  does not get clicked.
+- **Decision**: Keep the SPA (a Next.js migration is `TD-005` and not justified yet) and add
+  server-side endpoints:
+  - `GET /robots.txt` (allows the storefront, disallows `/api/`) and `GET /sitemap.xml` generated from
+    live catalog data (home, wholesale view, categories, every active product).
+  - `GET /product/:slug` **pre-renders** the shell for that product: correct `<title>`, description,
+    canonical URL, OpenGraph/Twitter tags and schema.org **Product JSON-LD** (price in IRR,
+    availability from variant stock), plus a `<noscript>` fallback block. Conflicting storefront-level
+    tags are stripped first so no two `og:title` tags compete.
+  - Product titles on the catalog grid are real `<a href="/product/...">` links (crawler-visible,
+    shareable), while a normal click still opens the SPA modal instantly.
+- **Consequences**: Product links can be shared on Instagram/WhatsApp with a proper preview and are
+  indexable. The `ClothingStore` JSON-LD and `PUBLIC_SITE_URL` remain configurable per deployment.
+
+---
+
+## ADR-016: Accessibility Baseline (WCAG 2.1 AA-oriented)
+- **Status**: Accepted
+- **Date**: 2026-09-20
+- **Context**: `IMPROVEMENT_PLAN.md` P1-7. The audit found ~1 `alt` attribute, zero ARIA usage and
+  placeholder-only form fields. Accessibility is also plain commercial sense: older customers and
+  keyboard/mobile users are a large share of the local market.
+- **Decision**: Establish and defend a baseline, checked automatically by `npm run a11y`
+  (`scripts/a11y-audit.mjs`, also run in CI):
+  - descriptive `alt` on every rendered image; `aria-label` on every icon-only control;
+  - a label for every form control (visible label, `aria-label`, or wrapping `<label>`), named
+    `radiogroup`s for option groups;
+  - overlays announced as `role="dialog"` + `aria-modal="true"` with a name; toasts in an
+    `aria-live="polite"` region; a skip-to-content link;
+  - a visible `:focus-visible` outline, a 44px minimum touch target for icon-only controls, and
+    `prefers-reduced-motion` support;
+  - `lang="fa"` + `dir="rtl"` and a zoom-friendly viewport.
+- **Consequences**: The audit script is a regression gate (17 checks today). It cannot detect
+  contrast or screen-reader flow, so a manual pass remains on the pre-launch checklist.

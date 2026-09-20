@@ -6,6 +6,8 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 1. Completed (انجام شده)
 
+- [x] **Phase 9.5: Revenue-Readiness Hardening** — all 12 items of `EXECUTION_PLAN.md` (persistence, inventory integrity, order state machine + audit trail, SMS notifications, process hardening, supertest HTTP tests, pagination, image upload, SEO, accessibility, backups, docs/release). ADR-010..016.
+
 - [x] **Phase 1 & 2: Repository Audit & Governance Setup**
   - [x] Initialize Git repository with `main` branch.
   - [x] Create `.gitignore` to protect environment secrets and cache files.
@@ -71,15 +73,19 @@ This document tracks all tasks, milestones, technical debt, and blocker items ac
 
 ## 2. In Progress (در حال اجرا)
 
-- [ ] **Phase 9.5: P0 Sales-Readiness (from `IMPROVEMENT_PLAN.md`)** ← NEXT
-  - [ ] Inventory integrity: validate + decrement stock atomically at checkout, restore on cancellation (prevents overselling).
-  - [ ] Order status change notifications via the Kavehnegar SMS adapter (already built).
-  - [ ] Real order state machine (allowed transitions + audit trail).
-  - [ ] Data persistence so a restart does not erase orders.
-- [ ] **Phase 7 & 9: Security Hardening & Production Configuration**
-  - [ ] Environment variable template (`.env.example`).
-  - [ ] Production containerization configuration (`Dockerfile`).
-  - [ ] Production readiness verification against Roadmap Section 46.
+- [x] **Phase 9.5: Revenue-Readiness Hardening (`EXECUTION_PLAN.md`, 12 items) — COMPLETE**
+  - [x] **Persistence (ADR-010)**: atomic debounced JSON snapshot (`src/server/db/persistence.js`), flush on shutdown, disabled under `NODE_ENV=test`/`PERSIST_DATA=false`, `RESET_DATA` re-seed, OTP records never restored. Verified across a real process restart.
+  - [x] **Inventory integrity (ADR-011)**: `db.checkStock`/`db.reserveStock`/`db.releaseStock`; `POST /api/orders` returns 409 `INSUFFICIENT_STOCK` with per-line availability; cancellation restores stock; cart warns before checkout.
+  - [x] **Order state machine (ADR-011)**: explicit transition map, 409 `INVALID_STATUS_TRANSITION` listing the legal next steps, `order.statusHistory[]` audit trail; the admin UI mirrors the map and shows the history.
+  - [x] **Order SMS notifications (ADR-012)**: placement, payment and status-change messages through the pluggable provider; failures recorded in `order.notifications[]` and never block the operation.
+  - [x] **Process hardening**: `app.js`/`index.js` split, graceful shutdown with data flush, `unhandledRejection` logging, `uncaughtException` flush + non-zero exit, OTP sweeper interval.
+  - [x] **Real HTTP tests**: `supertest` Level 7 suite (`tests/operations.test.js`) — 7 suites total in `npm test`.
+  - [x] **Pagination (ADR-014)**: `page`/`limit` with `meta.hasMore`, default 12 / cap 60, "show more" control in the storefront.
+  - [x] **Image upload (ADR-013)**: admin-only multipart upload, content sniffing, WebP re-encode, thumbnails, safe delete, `/uploads` static serving.
+  - [x] **SEO (ADR-015)**: `robots.txt`, data-driven `sitemap.xml`, pre-rendered `/product/:slug` with OG/Twitter tags, Product JSON-LD and `<noscript>`; product cards are real links.
+  - [x] **Accessibility (ADR-016)**: labels, alt text, dialog semantics, live regions, skip link, focus rings, reduced motion; `npm run a11y` (17 checks) enforced in CI.
+  - [x] **Backups**: `scripts/backup.sh` + `npm run backup` — create, verify, rotate, list, restore (tested).
+  - [x] **Docs + release**: ADR-010..016, ARCHITECTURE §12, CHANGELOG, this tracker, `project-state.json`, distribution archive rebuilt.
 
 ---
 

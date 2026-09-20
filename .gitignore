@@ -34,6 +34,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Runtime data (snapshot + uploaded product images) — ADR-010 / ADR-013
+# Never commit: contains real users, orders, OTP/payment records.
+data/
+!data/.gitkeep
+backups/
+logs/
+
 # OS & Editor files
 .DS_Store
 Thumbs.db

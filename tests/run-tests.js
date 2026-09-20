@@ -1,9 +1,16 @@
-import { runSecurityTests } from './security.test.js';
-import { runWholesaleTests } from './wholesale.test.js';
-import { runPricingTests } from './pricing.test.js';
-import { runAdversarialTests } from './adversarial.test.js';
-import { runPaymentTests } from './payment.test.js';
-import { runOtpTests } from './otp.test.js';
+// The suites import server modules at module-evaluation time, so NODE_ENV must
+// be set before those imports happen: hence the dynamic imports below.
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+// Test runs must never touch the on-disk snapshot of a real shop.
+process.env.PERSIST_DATA = 'false';
+
+const { runSecurityTests } = await import('./security.test.js');
+const { runWholesaleTests } = await import('./wholesale.test.js');
+const { runPricingTests } = await import('./pricing.test.js');
+const { runAdversarialTests } = await import('./adversarial.test.js');
+const { runPaymentTests } = await import('./payment.test.js');
+const { runOtpTests } = await import('./otp.test.js');
+const { runOperationsTests } = await import('./operations.test.js');
 
 async function main() {
   console.log('========================================================');
@@ -32,6 +39,9 @@ async function main() {
     await runOtpTests();
     passedCount++;
 
+    await runOperationsTests();
+    passedCount++;
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log('\n========================================================');
     console.log(`🎉 ALL ${passedCount} TEST SUITES PASSED SUCCESSFULLY! (${duration}s)`);
@@ -41,6 +51,7 @@ async function main() {
     console.log('✔ Level 4: Red Team Adversarial & BOLA Penetration: PASSED');
     console.log('✔ Level 5: Payment Gateway & Provider Adapter (BL-006): PASSED');
     console.log('✔ Level 6: OTP / SMS Mobile Verification (BL-007): PASSED');
+    console.log('✔ Level 7: Operations — inventory, order lifecycle, notifications, SEO, uploads: PASSED');
     console.log('========================================================\n');
     process.exit(0);
   } catch (error) {

@@ -17,7 +17,12 @@ const state = {
   searchQuery: '',
   currentView: 'catalog',
   activeAdminTab: 'wholesale',
-  selectedProduct: null
+  selectedProduct: null,
+  // Catalog pagination (ADR-014). The grid renders the first page and appends
+  // more on demand, so the first paint stays small on mobile connections.
+  productPage: 1,
+  productMeta: { page: 1, limit: 12, total: 0, totalPages: 1, hasMore: false },
+  productsLoading: false
 };
 
 // Helper: Format Iranian Rial / Tomans into Persian Numbers
@@ -34,14 +39,20 @@ function toPersianDigits(n) {
 
 // Helper: API Client with Auth headers (Enforces cryptographic JWT only, zero header spoofing)
 async function apiFetch(url, options = {}) {
+  // FormData uploads must let the browser set the multipart boundary itself:
+  // sending a fixed application/json header would break the upload.
+  const isFormData = options.isFormData === true || options.body instanceof FormData;
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(state.token ? { 'Authorization': `Bearer ${state.token}` } : {}),
     ...options.headers
   };
 
+  const { isFormData: _ignored, ...fetchOptions } = options;
+
   try {
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...fetchOptions, headers });
     const data = await res.json();
     return data;
   } catch (error) {
@@ -52,6 +63,20 @@ async function apiFetch(url, options = {}) {
 }
 
 // Helper: Toast Notifications
+/**
+ * Escape a value before it is interpolated into an HTML template.
+ * Product titles come from the admin panel and end up in attributes (alt,
+ * aria-label), so an unescaped quote would break the markup.
+ */
+function escapeAttr(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/'/g, '&#39;');
+}
+
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   if (!container) return;
@@ -233,8 +258,13 @@ function applyFilters() {
   fetchProducts();
 }
 
-async function fetchProducts() {
-  let url = `/api/products?sort=${state.activeSort}`;
+async function fetchProducts({ append = false } = {}) {
+  if (state.productsLoading) return;
+  state.productsLoading = true;
+
+  if (!append) state.productPage = 1;
+
+  let url = `/api/products?sort=${state.activeSort}&page=${state.productPage}&limit=${state.productMeta.limit || 12}`;
   if (state.activeCategory && state.activeCategory !== 'ALL') {
     url += `&category=${encodeURIComponent(state.activeCategory)}`;
   }
@@ -245,11 +275,52 @@ async function fetchProducts() {
     url += `&search=${encodeURIComponent(state.searchQuery)}`;
   }
 
-  const res = await apiFetch(url);
-  if (res.success) {
-    state.products = res.data;
-    renderProductsGrid();
+  try {
+    const res = await apiFetch(url);
+    if (res.success) {
+      state.products = append ? [...state.products, ...res.data] : res.data;
+      state.productMeta = res.meta || state.productMeta;
+      renderProductsGrid();
+      renderLoadMore();
+    }
+  } finally {
+    state.productsLoading = false;
   }
+}
+
+function loadMoreProducts() {
+  if (!state.productMeta.hasMore) return;
+  state.productPage += 1;
+  fetchProducts({ append: true });
+}
+
+/** "Load more" control + result counter under the grid. */
+function renderLoadMore() {
+  const container = document.getElementById('load-more-container');
+  if (!container) return;
+
+  const { total, hasMore } = state.productMeta || {};
+  const shown = state.products.length;
+
+  if (!total) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="flex flex-col items-center gap-3 pt-2">
+      <p class="text-xs text-slate-500">
+        نمایش <span class="font-bold text-slate-700">${toPersianDigits(shown)}</span>
+        از <span class="font-bold text-slate-700">${toPersianDigits(total)}</span> محصول
+      </p>
+      ${hasMore ? `
+        <button type="button" onclick="loadMoreProducts()"
+          class="px-6 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+          نمایش محصولات بیشتر
+        </button>
+      ` : ''}
+    </div>
+  `;
 }
 
 function renderProductsGrid() {
@@ -275,7 +346,7 @@ function renderProductsGrid() {
         
         <!-- IMAGE & BADGES -->
         <div class="relative aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer" onclick="openProductModal('${product.id}')">
-          <img src="${product.images[0]}" alt="${product.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+          <img src="${product.images[0]}" alt="${escapeAttr(product.title)}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
           <div class="absolute top-3 right-3 flex flex-col gap-1.5">
             ${product.isFeatured ? `<span class="bg-brand-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">پیشنهاد ویژه</span>` : ''}
             <span class="bg-slate-900/80 backdrop-blur text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">${product.season}</span>
@@ -295,8 +366,13 @@ function renderProductsGrid() {
               <span>${product.category}</span>
               <span class="font-mono text-[11px]">${product.sku}</span>
             </div>
-            <h3 class="font-bold text-slate-900 text-sm leading-snug mb-2 group-hover:text-brand-600 transition cursor-pointer" onclick="openProductModal('${product.id}')">
-              ${product.title}
+            <h3 class="font-bold text-slate-900 text-sm leading-snug mb-2">
+              <a href="/product/${encodeURIComponent(product.slug || product.id)}"
+                 data-product-link="${product.id}"
+                 onclick="return handleProductLink(event, '${product.id}')"
+                 class="hover:text-brand-600 transition-colors">
+                ${product.title}
+              </a>
             </h3>
             <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${product.material}</p>
           </div>
@@ -324,7 +400,37 @@ function renderProductsGrid() {
 }
 
 // Product Detail Modal
+/**
+ * Product links are real `<a href="/product/slug">` URLs so that search engines
+ * and social previews work (ADR-015), while a normal click stays instantaneous
+ * inside the SPA. Modified clicks (new tab) keep the browser's default behaviour.
+ */
+function handleProductLink(event, productId) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return true;
+  event.preventDefault();
+  openProductModal(productId);
+  window.history.pushState({ productId }, '', `/product/${encodeURIComponent(productId)}`);
+  return false;
+}
+
 function openProductModal(productId) {
+  // Deep-link support: /product/:slug and ?product=slug open the modal directly
+  // (the server pre-renders that URL for search engines — ADR-015).
+  if (typeof productId === 'string' && !state.products.some(p => p.id === productId || p.slug === productId)) {
+    const known = state.products.find(p => p.slug === productId || p.id === productId);
+    if (!known) {
+      apiFetch(`/api/products/${encodeURIComponent(productId)}`).then((res) => {
+        if (res.success) {
+          state.products = [res.data, ...state.products.filter(p => p.id !== res.data.id)];
+          openProductModal(res.data.id);
+        } else {
+          showToast('محصول مورد نظر یافت نشد.', 'error');
+        }
+      });
+      return;
+    }
+  }
+
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
@@ -357,12 +463,12 @@ function renderModalContent() {
       <!-- IMAGE GALLERY -->
       <div class="space-y-3">
         <div class="aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-          <img id="modal-main-img" src="${p.images[0]}" class="w-full h-full object-cover">
+          <img id="modal-main-img" src="${p.images[0]}" alt="${escapeAttr(p.title)} - تصویر اصلی" class="w-full h-full object-cover">
         </div>
         ${p.images.length > 1 ? `
           <div class="flex gap-2">
             ${p.images.map((img, idx) => `
-              <img src="${img}" onclick="document.getElementById('modal-main-img').src='${img}'" class="w-16 h-20 object-cover rounded-xl border border-slate-200 cursor-pointer hover:border-brand-500">
+              <img src="${img}" alt="${escapeAttr(p.title)} - تصویر ${index + 1}" role="button" tabindex="0" aria-label="نمایش تصویر ${index + 1} از ${escapeAttr(p.title)}" onclick="document.getElementById('modal-main-img').src='${img}'" class="w-16 h-20 object-cover rounded-xl border border-slate-200 cursor-pointer hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
             `).join('')}
           </div>
         ` : ''}
@@ -553,7 +659,7 @@ function renderCartUI() {
   // Render Items
   list.innerHTML = data.items.map(item => `
     <div class="pt-3 pb-3 flex gap-3">
-      <img src="${item.productImage}" class="w-16 h-20 object-cover rounded-xl border border-slate-200">
+      <img src="${item.productImage}" alt="${escapeAttr(item.productTitle)}" class="w-16 h-20 object-cover rounded-xl border border-slate-200">
       <div class="flex-grow flex flex-col justify-between">
         <div>
           <div class="flex justify-between items-start">
@@ -1021,15 +1127,19 @@ async function loadAdminOrders() {
             <span class="font-mono text-xs font-bold text-slate-800">${order.orderNumber}</span>
             <div class="text-xs text-slate-600 mt-0.5">مشتری: ${order.userFullName} (${order.userEmail})</div>
           </div>
-          <div class="flex items-center gap-2">
-            <select onchange="updateOrderStatusAdmin('${order.id}', this.value)" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 font-medium outline-none">
-              <option value="PENDING" ${order.status === 'PENDING' ? 'selected' : ''}>در انتظار تایید</option>
-              <option value="CONFIRMED" ${order.status === 'CONFIRMED' ? 'selected' : ''}>تایید شده</option>
-              <option value="PROCESSING" ${order.status === 'PROCESSING' ? 'selected' : ''}>در حال آماده‌سازی</option>
-              <option value="SHIPPED" ${order.status === 'SHIPPED' ? 'selected' : ''}>تحویل باربری/پست</option>
-              <option value="DELIVERED" ${order.status === 'DELIVERED' ? 'selected' : ''}>تحویل گردید</option>
-              <option value="CANCELLED" ${order.status === 'CANCELLED' ? 'selected' : ''}>لغو شده</option>
-            </select>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${getOrderStatusBadge(order.status)}">
+              ${translateOrderStatus(order.status)}
+            </span>
+            <!-- Only the legal next steps are offered (ADR-011: the lifecycle is a
+                 state machine, so the UI cannot even express an invalid jump). -->
+            ${allowedTransitionsFor(order.status).map(next => `
+              <button type="button"
+                onclick="updateOrderStatusAdmin('${order.id}', '${next}')"
+                class="text-[11px] font-bold px-3 py-1.5 min-h-[36px] rounded-lg border border-slate-300 bg-white hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                ${translateOrderStatus(next)}
+              </button>
+            `).join('')}
           </div>
         </div>
 
@@ -1038,9 +1148,11 @@ async function loadAdminOrders() {
         </div>
 
         <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
-          <span class="text-slate-500">نوع: ${order.orderType === 'WHOLESALE' ? 'عمده‌فروشی' : 'خرده‌فروشی'}</span>
+          <span class="text-slate-500">نوع: ${order.orderType === 'WHOLESALE' ? 'عمده‌فروشی' : 'خرده‌فروشی'} | پرداخت: ${translatePaymentStatus(order.paymentStatus)}</span>
           <span class="font-bold font-mono text-slate-900">${formatPrice(order.payableAmount)}</span>
         </div>
+
+        ${renderOrderHistory(order)}${renderOrderNotifications(order)}
       </div>
     `).join('');
   }
@@ -1054,9 +1166,28 @@ async function updateOrderStatusAdmin(orderId, status) {
 
   if (res.success) {
     showToast(res.message, 'success');
+  } else if (res.error === 'INVALID_STATUS_TRANSITION') {
+    // The lifecycle is a state machine (ADR-011); tell the admin what IS allowed.
+    const allowed = (res.allowedTransitions || []).join('، ') || 'بدون امکان تغییر';
+    showToast(`${res.message} گذارهای مجاز: ${allowed}`, 'error');
   } else {
     showToast(res.message || 'خطا در تغییر وضعیت', 'error');
   }
+}
+
+/** Order status timeline (audit trail) for the admin order card. */
+function renderOrderHistory(order) {
+  if (!order.statusHistory || order.statusHistory.length === 0) return '';
+  return `
+    <details class="pt-2">
+      <summary class="text-[11px] text-slate-500 cursor-pointer">تاریخچه تغییرات وضعیت (${toPersianDigits(order.statusHistory.length)})</summary>
+      <ul class="mt-2 space-y-1 text-[11px] text-slate-500">
+        ${order.statusHistory.map(h => `
+          <li>• ${translateOrderStatus(h.status)} — ${new Date(h.at).toLocaleString('fa-IR')}${h.by ? ` — توسط ${h.by}` : ''}${h.note ? ` — ${h.note}` : ''}</li>
+        `).join('')}
+      </ul>
+    </details>
+  `;
 }
 
 async function loadAdminProducts() {
@@ -1067,7 +1198,7 @@ async function loadAdminProducts() {
     container.innerHTML = res.data.map(p => `
       <div class="p-4 rounded-2xl border border-slate-200 bg-white flex flex-wrap items-center justify-between gap-4 shadow-sm">
         <div class="flex items-center gap-3">
-          <img src="${p.images[0]}" class="w-12 h-16 object-cover rounded-xl border border-slate-200">
+          <img src="${p.images[0]}" alt="${escapeAttr(p.title || 'تصویر محصول')}" class="w-12 h-16 object-cover rounded-xl border border-slate-200">
           <div>
             <h4 class="font-bold text-xs text-slate-900">${p.title}</h4>
             <div class="text-[11px] text-slate-500 font-mono">${p.sku} | ${p.category}</div>
@@ -1082,9 +1213,116 @@ async function loadAdminProducts() {
             <span class="text-amber-600 block text-[10px]">قیمت عمده:</span>
             <span class="font-mono font-bold text-amber-700">${formatPrice(p.wholesalePrice)}</span>
           </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">موجودی کل:</span>
+            <span class="font-mono font-bold ${totalStock(p) > 0 ? 'text-slate-800' : 'text-rose-600'}">${toPersianDigits(totalStock(p))}</span>
+          </div>
+        </div>
+
+        <!-- Product image upload (ADR-013): the photo IS the product for a boutique -->
+        <div class="w-full pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3">
+          <label class="text-[11px] font-bold text-slate-600" for="upload-${p.id}">افزودن تصویر جدید:</label>
+          <input type="file" id="upload-${p.id}" accept="image/jpeg,image/png,image/webp,image/avif"
+                 aria-label="انتخاب تصویر جدید برای ${escapeAttr(p.title)}"
+                 onchange="uploadProductImage('${p.id}', this)"
+                 class="text-[11px] file:ml-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-900 file:text-white file:text-[11px] file:font-bold">
+          <span class="text-[11px] text-slate-400">
+            تصاویر: ${toPersianDigits((p.images || []).length)} — فرمت‌های مجاز JPEG/PNG/WebP، حداکثر ۵ مگابایت
+          </span>
         </div>
       </div>
     `).join('');
+  }
+}
+
+/**
+ * Mirrors the server-side state machine (ADR-011) so the admin UI never offers
+ * an action the API would reject. The server remains the authority.
+ */
+const ORDER_TRANSITIONS = {
+  PENDING: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: []
+};
+
+function allowedTransitionsFor(status) {
+  return ORDER_TRANSITIONS[status] || [];
+}
+
+function translatePaymentStatus(status) {
+  return {
+    PENDING: 'پرداخت‌نشده',
+    PAID: 'پرداخت شده',
+    FAILED: 'ناموفق',
+    REFUNDED: 'بازگشت داده شده'
+  }[status || 'PENDING'] || (status || 'پرداخت‌نشده');
+}
+
+/** Notification log for an order: did the customer actually get the SMS? */
+function renderOrderNotifications(order) {
+  if (!order.notifications || order.notifications.length === 0) return '';
+  const failed = order.notifications.filter(n => !n.ok);
+  return `
+    <details class="pt-2">
+      <summary class="text-[11px] text-slate-500 cursor-pointer">
+        پیامک‌های ارسالی (${toPersianDigits(order.notifications.length)})
+        ${failed.length ? `<span class="text-rose-600 font-bold">— ${toPersianDigits(failed.length)} ناموفق</span>` : ''}
+      </summary>
+      <ul class="mt-2 space-y-1 text-[11px] text-slate-500">
+        ${order.notifications.slice().reverse().map(n => `
+          <li class="${n.ok ? '' : 'text-rose-600'}">
+            ${n.ok ? '✓' : '✗'} ${n.kind === 'OTP' ? 'کد ورود' : (n.status ? translateOrderStatus(n.status) : 'ثبت سفارش')}
+            — ${new Date(n.at).toLocaleString('fa-IR')}${n.error ? ` — ${escapeAttr(n.error)}` : ''}
+          </li>
+        `).join('')}
+      </ul>
+    </details>
+  `;
+}
+
+/** Total stock across all variants — the number an admin actually cares about. */
+function totalStock(product) {
+  return (product.variants || []).reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+}
+
+/** Upload one image for a product and refresh the admin list. */
+async function uploadProductImage(productId, inputEl) {
+  const file = inputEl?.files?.[0];
+  if (!file) return;
+
+  const maxBytes = 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('حجم تصویر بیش از ۵ مگابایت است.', 'error');
+    inputEl.value = '';
+    return;
+  }
+
+  const form = new FormData();
+  form.append('image', file);
+
+  showToast('در حال بارگذاری تصویر…', 'info');
+
+  try {
+    const res = await apiFetch(`/api/admin/products/${productId}/images`, {
+      method: 'POST',
+      body: form,          // apiFetch must not set Content-Type for FormData
+      isFormData: true
+    });
+
+    if (res.success) {
+      showToast('تصویر با موفقیت بارگذاری شد.', 'success');
+      await loadAdminProducts();
+      await fetchProducts();
+    } else {
+      showToast(res.message || 'بارگذاری تصویر ناموفق بود.', 'error');
+    }
+  } catch (error) {
+    showToast('خطای شبکه در بارگذاری تصویر.', 'error');
+  } finally {
+    inputEl.value = '';
   }
 }
 
@@ -1125,6 +1363,25 @@ async function initApp() {
   await fetchCategories();
   await fetchProducts();
   await recalculateCart();
+
+  // Open a product directly when arriving from a shared link
+  // (/product/<slug> pre-rendered by the server, or /?product=<slug>).
+  const pathMatch = window.location.pathname.match(/^\/product\/(.+)$/);
+  const queryProduct = new URLSearchParams(window.location.search).get('product');
+  const deepLink = pathMatch ? decodeURIComponent(pathMatch[1]) : queryProduct;
+
+  if (deepLink) {
+    await openProductModal(deepLink);
+  }
+
+  // Payment result / filter deep links
+  const params = new URLSearchParams(window.location.search);
+  const categoryParam = params.get('category');
+  if (categoryParam) {
+    state.activeCategory = categoryParam;
+    state.productPage = 1;
+    await fetchProducts();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initApp);

@@ -289,3 +289,27 @@ POST /api/auth/otp/verify   -> timing-safe hash comparison
 `payments`: `id, orderId, userId, provider, authority, amountRial, amountToman, status (PENDING|PAID|FAILED), refId, cardPan, createdAt, verifiedAt, attempts`
 
 `otps` (ephemeral): `mobile, codeHash, salt, expiresAt, attempts, lastSentAt, sendCount, sendWindowStartedAt`
+
+
+## 12. Operational Layer (added 2026-09-20 — ADR-010..016)
+
+| Concern | Module | Guarantee |
+|---|---|---|
+| Persistence | `src/server/db/persistence.js` | Atomic snapshot (tmp → fsync → rename), debounced, flushed on shutdown; disabled under test |
+| Inventory | `db.checkStock` / `db.reserveStock` / `db.releaseStock` | No overselling; 409 with per-line availability; stock returns on cancellation |
+| Order lifecycle | `db.ORDER_STATUS_TRANSITIONS` / `db.transitionOrderStatus` | Illegal transitions refused (409 + allowed list); every change audited in `statusHistory[]` |
+| Customer SMS | `src/server/services/notification.service.js` | Persian SMS at placement, payment and each status change; failures recorded, never block the request |
+| App/listener split | `src/server/app.js` (`createApp()`) + `src/server/index.js` | Routes are testable over real HTTP (supertest) without opening a port |
+| Image uploads | `src/server/routes/upload.routes.js` (+ `sharp`) | Admin-only, content-sniffed, re-encoded to WebP, thumbnailed, EXIF stripped |
+| Pagination | `src/server/routes/product.routes.js` + `db.listProducts({page, limit})` | Bounded responses (`meta.hasMore`), default 12 / cap 60 |
+| SEO | `src/server/routes/seo.routes.js` | `robots.txt`, data-driven `sitemap.xml`, pre-rendered `/product/:slug` with OG + Product JSON-LD + `<noscript>` |
+| Accessibility | `src/client/public/styles.css` + markup contract | `npm run a11y` — 17 checks, also enforced in CI |
+| Backups / ops | `scripts/backup.sh`, `npm run backup` | Timestamped, integrity-verified archives with rotation and `--restore` |
+
+**Process safety**: `index.js` logs unhandled promise rejections without killing the shop, flushes
+data and exits non-zero on an uncaught exception (so the process manager restarts a clean instance),
+and purges expired OTP records on an interval.
+
+**Test gate**: 7 suites (`npm test`) — L1 pricing, L2 wholesale, L3 security/JWT, L4 red team,
+L5 payments, L6 OTP, L7 operations (inventory, lifecycle, notifications, SEO, uploads, persistence
+over real HTTP).

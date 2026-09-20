@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { db } from '../db/store.js';
+import { db, ORDER_STATUSES } from '../db/store.js';
+import { notifyStatusChange } from '../services/notification.service.js';
 import { requireRole } from '../middlewares/auth.js';
 
 const router = Router();
@@ -137,30 +138,54 @@ router.get('/orders', (req, res) => {
 });
 
 router.put('/orders/:id/status', (req, res) => {
-  const { status } = req.body;
-  const validStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+  const { status, note } = req.body || {};
 
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({
+  const result = db.transitionOrderStatus(req.params.id, status, {
+    by: req.user?.id || 'admin',
+    note: note || ''
+  });
+
+  if (!result.ok) {
+    if (result.reason === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'ORDER_NOT_FOUND', message: 'سفارش یافت نشد.' });
+    }
+
+    if (result.reason === 'INVALID_STATUS') {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_ORDER_STATUS',
+        message: `وضعیت سفارش نامعتبر است. وضعیت‌های مجاز: ${ORDER_STATUSES.join(', ')}`,
+        allowedStatuses: ORDER_STATUSES
+      });
+    }
+
+    // Invalid transition (ADR-011): the order lifecycle is a state machine, not
+    // a free-form field. A delivered order cannot go back to pending, etc.
+    return res.status(409).json({
       success: false,
-      error: 'INVALID_ORDER_STATUS',
-      message: `وضعیت سفارش نامعتبر است. وضعیت‌های مجاز: ${validStatuses.join(', ')}`
+      error: 'INVALID_STATUS_TRANSITION',
+      message: `گذار از وضعیت «${result.from}» به «${status}» مجاز نیست.`,
+      from: result.from,
+      allowedTransitions: result.allowed
     });
   }
 
-  const updatedOrder = db.updateOrderStatus(req.params.id, status);
-  if (!updatedOrder) {
-    return res.status(404).json({
-      success: false,
-      error: 'ORDER_NOT_FOUND',
-      message: 'سفارش یافت نشد.'
-    });
+  // Cancelling returns the reserved stock to the catalog.
+  if (status === 'CANCELLED' && result.order.stockReserved) {
+    const released = db.releaseStock(result.order.items);
+    result.order.stockReleased = released;
+    result.order.stockReserved = false;
+    db.persist();
   }
+
+  // Customer SMS (ADR-012) — fire and forget, never blocks the admin request.
+  notifyStatusChange(result.order, status);
 
   res.json({
     success: true,
-    data: updatedOrder,
-    message: `وضعیت سفارش به ${status} تغییر یافت.`
+    data: result.order,
+    message: `وضعیت سفارش از «${result.from}» به «${status}» تغییر یافت.`,
+    allowedTransitions: result.allowed
   });
 });
 

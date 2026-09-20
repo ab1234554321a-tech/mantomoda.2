@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db/store.js';
 import { requireAuth } from '../middlewares/auth.js';
 import { validate, orderCheckoutSchema } from '../middlewares/validate.js';
+import { notifyOrderPlaced } from '../services/notification.service.js';
 
 const router = Router();
 
@@ -10,6 +11,19 @@ router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
   const { items, shippingAddress, paymentMethod } = req.body;
 
   const isWholesaleUser = req.user.role === 'ADMIN' || (req.user.role === 'WHOLESALE' && req.user.isWholesaleVerified === true);
+
+  // --- Inventory gate (ADR-011): never sell what is not in stock ---
+  // Validated here, before any price math, so the customer gets a precise
+  // "which item, how many are left" answer instead of a generic failure.
+  const stockCheck = db.checkStock(items);
+  if (!stockCheck.ok) {
+    return res.status(409).json({
+      success: false,
+      error: 'INSUFFICIENT_STOCK',
+      message: 'موجودی برخی اقلام سبد خرید کافی نیست. لطفاً تعداد را اصلاح کنید.',
+      shortages: stockCheck.shortages
+    });
+  }
 
   // Recalculate price strictly on server (Anti-Tampering ADR-003)
   let subtotal = 0;
@@ -53,18 +67,38 @@ router.post('/', requireAuth, validate(orderCheckoutSchema), (req, res) => {
   const shippingFee = subtotal > 2000000 || isWholesaleUser ? 0 : 45000;
   const payableAmount = subtotal + shippingFee;
 
+  // --- Atomic reservation (ADR-011) ---
+  // The cart stock check above is advisory; this is the authoritative lock.
+  // There is no `await` between validation and decrement, so Node's single
+  // thread guarantees two simultaneous checkouts cannot oversell the same item.
+  const reservation = db.reserveStock(items);
+  if (!reservation.ok) {
+    return res.status(409).json({
+      success: false,
+      error: 'INSUFFICIENT_STOCK',
+      message: 'موجودی برخی اقلام در همین لحظه تغییر کرد و کافی نیست. لطفاً سبد خرید را بازبینی کنید.',
+      shortages: reservation.shortages
+    });
+  }
+
   const order = db.createOrder({
     userId: req.user.id,
     userFullName: req.user.fullName,
     userEmail: req.user.email,
+    userPhone: req.user.phone || '',
     orderType: hasWholesaleItem ? 'WHOLESALE' : 'RETAIL',
     items: orderItems,
     totalAmount: subtotal,
     discountAmount: 0,
+    shippingFee,
     payableAmount,
     paymentMethod: paymentMethod || 'ONLINE_GATEWAY',
+    stockReserved: true,
     shippingAddress
   });
+
+  // Order-received SMS (ADR-012). Never blocks or fails the checkout.
+  notifyOrderPlaced(order);
 
   res.status(201).json({
     success: true,

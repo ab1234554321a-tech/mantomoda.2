@@ -16,28 +16,43 @@ router.get('/categories', (req, res) => {
   });
 });
 
-// List Products with Filters
+// List Products with Filters + Pagination (ADR-014)
+// Why pagination: shipping the whole catalog in one response does not survive
+// growth — 500 products on a weak mobile connection is several megabytes.
+// Defaults: page 1, 12 items. Maximum page size is 60 to keep responses bounded.
 router.get('/', (req, res) => {
-  const { category, search, season, minPrice, maxPrice, sort } = req.query;
+  const { category, search, season, minPrice, maxPrice, sort, page, limit } = req.query;
 
-  let products = db.listProducts({ category, search, season, minPrice, maxPrice });
+  const paginated = page !== undefined || limit !== undefined;
+
+  let products = db.listProducts(
+    paginated
+      ? { category, search, season, minPrice, maxPrice, page, limit }
+      : { category, search, season, minPrice, maxPrice }
+  );
+
+  let items = paginated ? products.items : products;
+  const meta = paginated
+    ? products.meta
+    : { page: 1, limit: items.length, total: items.length, totalPages: 1, hasMore: false };
 
   // Sorting
   if (sort === 'price-asc') {
-    products.sort((a, b) => a.retailPrice - b.retailPrice);
+    items.sort((a, b) => a.retailPrice - b.retailPrice);
   } else if (sort === 'price-desc') {
-    products.sort((a, b) => b.retailPrice - a.retailPrice);
+    items.sort((a, b) => b.retailPrice - a.retailPrice);
   } else if (sort === 'rating') {
-    products.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    items.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   } else {
     // Default featured/newest
-    products.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+    items.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
   }
 
   res.json({
     success: true,
-    data: products,
-    count: products.length
+    data: items,
+    count: items.length,
+    meta
   });
 });
 

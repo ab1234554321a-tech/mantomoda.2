@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Tests (6 suites) + Security Audit
+    name: Tests (7 suites) + A11y + Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -41,6 +41,15 @@ jobs:
           NODE_ENV: test
           # Tests generate their own secrets; placeholders below are never used in production.
           JWT_SECRET: ci_only_secret_key_that_is_long_enough_for_validation_1234
+
+      - name: Accessibility gate (ADR-016)
+        run: npm run a11y
+
+      - name: Backup script smoke test
+        run: |
+          bash -n scripts/backup.sh
+          DATA_DIR="$(mktemp -d)" BACKUP_DIR="$(mktemp -d)" bash scripts/backup.sh
+          echo "Backup script ran cleanly."
 
       - name: Verify no secrets were committed
         run: |

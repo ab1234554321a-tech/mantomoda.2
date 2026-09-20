@@ -101,6 +101,69 @@ export const kavenegarProvider = {
     } finally {
       clearTimeout(timer);
     }
+  },
+
+  /**
+   * Send a free-form transactional message (order status updates).
+   * Uses /sms/send.json, unlike OTP which uses the pre-approved pattern lookup.
+   */
+  async sendMessage({ mobile, message }) {
+    if (!isConfigured()) {
+      throw Object.assign(
+        new Error(`Kavenegar is not configured. Missing: ${missingConfig().join(', ')}`),
+        { statusCode: 503, code: 'SMS_PROVIDER_NOT_CONFIGURED' }
+      );
+    }
+
+    const receptor = normaliseMobile(mobile);
+    const url =
+      `https://api.kavenegar.com/v1/${process.env.KAVENEGAR_API_KEY}/sms/send.json` +
+      `?receptor=${encodeURIComponent(receptor)}` +
+      `&sender=${encodeURIComponent(process.env.KAVENEGAR_SENDER)}` +
+      `&message=${encodeURIComponent(message)}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, signal: controller.signal });
+      const text = await response.text();
+
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        throw Object.assign(new Error(`Kavenegar returned a non-JSON response (HTTP ${response.status}).`), {
+          statusCode: 502, code: 'SMS_PROVIDER_ERROR'
+        });
+      }
+
+      const entry = Array.isArray(body?.return) ? body.return[0] : body?.return;
+      const status = Number(entry?.status);
+
+      if (response.status >= 400 || (status && status !== 200)) {
+        throw Object.assign(
+          new Error(`Kavenegar rejected the message: ${entry?.message || `status ${status || 'unknown'}`}`),
+          { statusCode: 502, code: 'SMS_PROVIDER_ERROR' }
+        );
+      }
+
+      return {
+        ok: true,
+        messageId: entry?.messageid ? String(entry.messageid) : null,
+        provider: 'kavenegar',
+        raw: entry || null
+      };
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw Object.assign(new Error(`Kavenegar request timed out after ${REQUEST_TIMEOUT_MS}ms.`), {
+          statusCode: 504, code: 'SMS_PROVIDER_TIMEOUT'
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 };
 

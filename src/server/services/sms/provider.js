@@ -47,5 +47,7 @@ export function getSmsProvider() {
  * Provider adapter contract (enforced by tests):
  *   sendOtp({ mobile, code, template })
  *     -> { ok, messageId, provider, raw }
+ *   sendMessage({ mobile, message })
+ *     -> { ok, messageId, provider, raw }
  */
-export const SMS_PROVIDER_CONTRACT = ['sendOtp'];
+export const SMS_PROVIDER_CONTRACT = ['sendOtp', 'sendMessage'];

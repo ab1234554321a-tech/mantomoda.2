@@ -63,3 +63,34 @@
 > built. The shipped client is a focused Vanilla JS SPA. A React/Next.js migration remains a *planned*
 > option (`TD-005`) for SSR/SEO, not a description of today's code.
 - **Architecture**: Modular Controller-Service-Repository Pattern with RBAC Guards
+
+## 9. Operational Guarantees (Phase 9.5)
+
+These are the guarantees that make the shop safe to sell from, and each one is covered by an
+automated test (`npm test`, 7 suites) or a gate (`npm run a11y`):
+
+| Guarantee | How it is enforced | Proof |
+|---|---|---|
+| Orders survive a restart | Atomic JSON snapshot, debounced, flushed on shutdown (`PERSIST_DATA=true`) | Verified end-to-end across a real process restart |
+| The shop can never oversell | Validate-then-decrement on checkout; 409 with per-item availability | `tests/operations.test.js` + HTTP walkthrough |
+| Cancelling returns stock | `db.releaseStock` on the `CANCELLED` transition | Same suite |
+| Order status cannot jump | Explicit state machine; 409 lists the legal next steps | Same suite |
+| You can see who changed what | `order.statusHistory[]` (from → to, who, when, note) | Same suite |
+| Customers get an SMS | Persian messages at placement, payment, each status change | Same suite (including gateway-failure tolerance) |
+| Photos can be uploaded | Admin upload → content sniffing → WebP + thumbnail | Same suite (polyglot upload rejected) |
+| Google/Instagram see products | Pre-rendered product pages with OG tags and Product JSON-LD, sitemap, robots | Same suite |
+| Keyboard/screen-reader basics | `npm run a11y` — 17 checks, run in CI | `npm run a11y` |
+| Data can be recovered | `npm run backup` (verify + rotate) and `--restore` | Script tested |
+
+**Running with persistence (production):**
+
+```bash
+PERSIST_DATA=true DATA_DIR=/var/lib/mantomoda UPLOAD_DIR=/var/lib/mantomoda/uploads \
+  JWT_SECRET="<32+ chars>" PAYMENT_PROVIDER=zarinpal SMS_PROVIDER=kavenegar npm start
+```
+
+**Backups (daily cron example):**
+
+```cron
+30 3 * * * cd /srv/mantomoda && bash scripts/backup.sh --keep 30 >> logs/backup.log 2>&1
+```

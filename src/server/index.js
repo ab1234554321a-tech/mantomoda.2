@@ -1,161 +1,85 @@
+// =============================================================================
+//  Server entry point: binds the HTTP listener and owns process lifecycle.
+//  The Express application itself lives in ./app.js (importable by tests).
+// =============================================================================
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import path from 'path';
-import crypto from 'crypto';
-import { fileURLToPath } from 'url';
+import { createApp } from './app.js';
+import { db } from './db/store.js';
 
-import { authenticate } from './middlewares/auth.js';
-import { errorHandler } from './middlewares/error-handler.js';
-import authRoutes from './routes/auth.routes.js';
-import productRoutes from './routes/product.routes.js';
-import wholesaleRoutes from './routes/wholesale.routes.js';
-import cartRoutes from './routes/cart.routes.js';
-import orderRoutes from './routes/order.routes.js';
-import adminRoutes from './routes/admin.routes.js';
-import paymentRoutes from './routes/payment.routes.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
 const PORT = process.env.PORT || 3000;
+const app = createApp();
 
-// 1. Security Headers (Helmet)
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
-      connectSrc: ["'self'"],
-      // Configurable so the app can be embedded in staging/preview iframes.
-      // Default remains restrictive ('self'); production must NOT widen this.
-      // Example: CSP_FRAME_ANCESTORS="https://panel.example.com,https://admin.example.com"
-      frameAncestors: process.env.CSP_FRAME_ANCESTORS
-        ? process.env.CSP_FRAME_ANCESTORS.split(',').map((s) => s.trim()).filter(Boolean)
-        : ["'self'"]
-    }
-  },
-  crossOriginEmbedderPolicy: false,
-  // X-Frame-Options duplicates the CSP frame-ancestors policy and would block
-  // trusted embedding even after CSP is widened, so it is disabled only when
-  // CSP_FRAME_ANCESTORS is explicitly configured. Default stays SAMEORIGIN.
-  frameguard: process.env.CSP_FRAME_ANCESTORS ? false : { action: 'sameorigin' }
-}));
-
-// 2. CORS Configuration
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
-
-// 3. Body Parsers with payload size limits (DoS Prevention)
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-
-// 4. SRE & Observability: Request ID and Request Duration Logging
-app.use((req, res, next) => {
-  const reqId = req.headers['x-request-id'] || `req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-  req.id = reqId;
-  res.setHeader('X-Request-Id', reqId);
-
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    if (req.path.startsWith('/api')) {
-      console.log(`[HTTP] ${req.method} ${req.path} -> Status: ${res.statusCode} (${duration}ms) [ReqID: ${reqId}]`);
-    }
-  });
-
-  next();
-});
-
-// 5. Rate Limiting (Brute-Force & Abuse Mitigation)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'test' ? 1000 : 30, // 30 attempts per 15 minutes in prod
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: 'تعداد درخواست‌های احراز هویت بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر مجدداً تلاش کنید.'
-  }
-});
-
-const generalApiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: process.env.NODE_ENV === 'test' ? 5000 : 300,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-// 6. Global Authentication Context Extractor (HMAC-SHA256 JWT)
-app.use(authenticate);
-
-// 7. Health & Observability Endpoint
-app.get('/api/health', (req, res) => {
-  const memoryUsage = process.memoryUsage();
-  res.json({
-    status: 'healthy',
-    project: 'Manto Moda',
-    version: '0.3.0-rc1',
-    environment: process.env.NODE_ENV || 'development',
-    uptimeSeconds: Math.floor(process.uptime()),
-    memory: {
-      heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-      heapTotalMB: Math.round(memoryUsage.heapTotal / 1024 / 1024),
-      rssMB: Math.round(memoryUsage.rss / 1024 / 1024)
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
-// 8. Mount API Routes with Rate Limiters
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/products', generalApiLimiter, productRoutes);
-app.use('/api/wholesale', generalApiLimiter, wholesaleRoutes);
-app.use('/api/cart', generalApiLimiter, cartRoutes);
-app.use('/api/orders', generalApiLimiter, orderRoutes);
-app.use('/api/payments', generalApiLimiter, paymentRoutes);
-app.use('/api/admin', generalApiLimiter, adminRoutes);
-
-// 9. Serve Client Static Files
-const publicPath = path.join(__dirname, '../client/public');
-app.use(express.static(publicPath));
-
-// Fallback to index.html for SPA client routing
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-// 10. Global Error Handler Pipeline (Safe from Stack Leakage)
-app.use(errorHandler);
-
-// Start Server bound to 0.0.0.0
 const server = app.listen(PORT, '0.0.0.0', () => {
+  const persistence = db.persistenceInfo();
   console.log(`[Manto Moda] Server running at http://0.0.0.0:${PORT}`);
   console.log(`[Manto Moda] Production State & Architecture verified.`);
+  console.log(
+    persistence.enabled
+      ? `[Manto Moda] Persistence: enabled (${persistence.snapshotFile})`
+      : '[Manto Moda] Persistence: disabled (set PERSIST_DATA=true to keep data across restarts)'
+  );
 });
 
-// Graceful Shutdown Handling (DevOps & SRE)
-const shutdown = () => {
-  console.log('[Manto Moda] Gracefully shutting down server...');
+// ---------------------------------------------------------------------------
+// Graceful shutdown: stop accepting connections, flush pending snapshot writes.
+// ---------------------------------------------------------------------------
+let shuttingDown = false;
+
+const shutdown = (signal = 'SIGTERM', exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  console.log(`[Manto Moda] Gracefully shutting down server (${signal})...`);
+
+  // Stop the OTP housekeeping timer so the process can exit cleanly.
+  if (otpSweeper) clearInterval(otpSweeper);
+
+  const flushed = db.flush();
+  if (flushed) console.log('[Manto Moda] Pending data snapshot flushed to disk.');
+
+  const forceExit = setTimeout(() => {
+    console.error('[Manto Moda] Forced exit: connections did not close in time.');
+    process.exit(exitCode || 1);
+  }, 5000);
+  forceExit.unref();
+
   server.close(() => {
     console.log('[Manto Moda] HTTP server closed cleanly.');
-    process.exit(0);
+    process.exit(exitCode);
   });
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+process.on('SIGTERM', () => shutdown('SIGTERM', 0));
+process.on('SIGINT', () => shutdown('SIGINT', 0));
+
+// ---------------------------------------------------------------------------
+// Process-level safety nets (see IMPROVEMENT_PLAN.md P2 #9).
+//   - an unhandled promise rejection is logged but does NOT kill the shop;
+//   - an uncaught exception is unrecoverable, so we log it, flush data and exit
+//     non-zero to let the process manager restart a clean instance.
+// ---------------------------------------------------------------------------
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled promise rejection:', reason instanceof Error ? reason.stack || reason.message : reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[FATAL] Uncaught exception:', error?.stack || error);
+  shutdown('uncaughtException', 1);
+});
+
+// ---------------------------------------------------------------------------
+// OTP housekeeping: expired verification codes are dropped periodically so the
+// in-memory collection cannot grow without bound.
+// ---------------------------------------------------------------------------
+const OTP_SWEEP_INTERVAL_MS = Number(process.env.OTP_SWEEP_INTERVAL_MS || 5 * 60 * 1000);
+let otpSweeper = setInterval(() => {
+  try {
+    const removed = db.purgeExpiredOtps();
+    if (removed > 0) console.log(`[Manto Moda] Purged ${removed} expired OTP record(s).`);
+  } catch (error) {
+    console.error('[Manto Moda] OTP sweep failed:', error.message);
+  }
+}, OTP_SWEEP_INTERVAL_MS);
+otpSweeper.unref();
 
 export default app;
